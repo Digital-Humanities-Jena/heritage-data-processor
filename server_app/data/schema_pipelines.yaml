@@ -1,0 +1,549 @@
+# pipeline_database_schema.yaml
+database_name: pipeline_system.db
+description: "Comprehensive pipeline management database for storing pipeline definitions, executions, and file relationships"
+
+tables:
+  # --- Pipeline Metadata ---
+  pipelines:
+    description: "Main pipeline definitions and metadata"
+    columns:
+      - name: pipeline_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: identifier
+        type: TEXT
+        constraints: [NOT NULL, UNIQUE]
+      - name: name
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: description
+        type: TEXT
+      - name: primary_modality
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: processing_mode
+        type: TEXT
+        constraints: [NOT NULL, CHECK (processing_mode IN ('root', 'subdirectory'))]
+      - name: version
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT '1.0.0']
+      - name: status
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT 'draft', CHECK (status IN ('draft', 'active', 'archived', 'deprecated'))]
+      - name: tags
+        type: TEXT  # JSON array of tags
+      - name: notes
+        type: TEXT
+      - name: created_by
+        type: TEXT
+      - name: created_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: last_modified_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: yaml_source
+        type: TEXT  # Original YAML content if imported
+      - name: execution_count
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 0]
+      - name: last_executed_timestamp
+        type: DATETIME
+    indexes:
+      - name: idx_pipelines_identifier
+        columns: [identifier]
+      - name: idx_pipelines_modality
+        columns: [primary_modality]
+      - name: idx_pipelines_status
+        columns: [status]
+      - name: idx_pipelines_created
+        columns: [created_timestamp]
+    triggers:
+      - name: update_pipeline_last_modified
+        event: AFTER UPDATE
+        action: "UPDATE pipelines SET last_modified_timestamp = CURRENT_TIMESTAMP WHERE pipeline_id = NEW.pipeline_id;"
+
+  # --- Pipeline Steps ---
+  pipeline_steps:
+    description: "Individual processing steps within pipelines"
+    columns:
+      - name: step_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: pipeline_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: step_number
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: step_name
+        type: TEXT
+      - name: component_name
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: component_category
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: component_version
+        type: TEXT
+      - name: is_optional
+        type: BOOLEAN
+        constraints: [NOT NULL, DEFAULT FALSE]
+      - name: on_error_action
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT 'fail', CHECK (on_error_action IN ('fail', 'skip', 'retry', 'warn'))]
+      - name: timeout_seconds
+        type: INTEGER
+        constraints: [DEFAULT 300]
+      - name: memory_limit_mb
+        type: INTEGER
+        constraints: [DEFAULT 512]
+      - name: cpu_limit
+        type: INTEGER
+        constraints: [DEFAULT 1]
+      - name: parallel_execution
+        type: BOOLEAN
+        constraints: [NOT NULL, DEFAULT FALSE]
+      - name: depends_on_steps
+        type: TEXT  # JSON array of step_ids this step depends on
+      - name: condition_expression
+        type: TEXT  # Optional condition for step execution
+      - name: created_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+    constraints:
+      - type: FOREIGN KEY
+        columns: [pipeline_id]
+        references: pipelines(pipeline_id)
+        on_delete: CASCADE
+      - type: UNIQUE
+        columns: [pipeline_id, step_number]
+    indexes:
+      - name: idx_steps_pipeline
+        columns: [pipeline_id]
+      - name: idx_steps_component
+        columns: [component_name]
+      - name: idx_steps_number
+        columns: [pipeline_id, step_number]
+
+  # --- Step Files (Inputs and Outputs) ---
+  step_files:
+    description: "Input and output files for pipeline steps"
+    columns:
+      - name: file_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: step_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: file_role
+        type: TEXT
+        constraints: [NOT NULL, CHECK (file_role IN ('input', 'output', 'parameter'))]
+      - name: file_name
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: file_type
+        type: TEXT
+        constraints: [NOT NULL]  # image, model, audio, video, document, data
+      - name: filename_pattern
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: mime_type
+        type: TEXT
+      - name: is_required
+        type: BOOLEAN
+        constraints: [NOT NULL, DEFAULT TRUE]
+      - name: is_source_file
+        type: BOOLEAN
+        constraints: [NOT NULL, DEFAULT FALSE]
+      - name: replace_source_file
+        type: BOOLEAN
+        constraints: [NOT NULL, DEFAULT FALSE]
+      - name: add_to_record
+        type: BOOLEAN
+        constraints: [NOT NULL, DEFAULT TRUE]
+      - name: source_step_id
+        type: INTEGER  # Which step generated this file (for outputs)
+      - name: file_order
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 0]
+      - name: validation_rules
+        type: TEXT  # JSON object with validation rules
+      - name: metadata
+        type: TEXT  # JSON object with additional metadata
+    constraints:
+      - type: FOREIGN KEY
+        columns: [step_id]
+        references: pipeline_steps(step_id)
+        on_delete: CASCADE
+      - type: FOREIGN KEY
+        columns: [source_step_id]
+        references: pipeline_steps(step_id)
+    indexes:
+      - name: idx_step_files_step
+        columns: [step_id]
+      - name: idx_step_files_role
+        columns: [file_role]
+      - name: idx_step_files_type
+        columns: [file_type]
+      - name: idx_step_files_source
+        columns: [source_step_id]
+
+  # --- Component Parameters ---
+  component_parameters:
+    description: "Parameter configurations for pipeline step components"
+    columns:
+      - name: parameter_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: step_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: parameter_name
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: parameter_type
+        type: TEXT
+        constraints: [NOT NULL, CHECK (parameter_type IN ('str', 'int', 'float', 'bool', 'list', 'dict'))]
+      - name: parameter_value
+        type: TEXT  # JSON-encoded value
+        constraints: [NOT NULL]
+      - name: default_value
+        type: TEXT  # JSON-encoded default
+      - name: is_required
+        type: BOOLEAN
+        constraints: [NOT NULL, DEFAULT FALSE]
+      - name: validation_rules
+        type: TEXT  # JSON object with validation rules
+      - name: description
+        type: TEXT
+    constraints:
+      - type: FOREIGN KEY
+        columns: [step_id]
+        references: pipeline_steps(step_id)
+        on_delete: CASCADE
+      - type: UNIQUE
+        columns: [step_id, parameter_name]
+    indexes:
+      - name: idx_parameters_step
+        columns: [step_id]
+      - name: idx_parameters_name
+        columns: [parameter_name]
+
+  # --- Pipeline Executions ---
+  pipeline_executions:
+    description: "Execution history and status tracking"
+    columns:
+      - name: execution_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: pipeline_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: execution_uuid
+        type: TEXT
+        constraints: [NOT NULL, UNIQUE]
+      - name: project_id
+        type: INTEGER  # Link to project if applicable
+      - name: status
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT 'pending', CHECK (status IN ('pending', 'running', 'completed', 'failed', 'cancelled', 'paused'))]
+      - name: progress_percentage
+        type: REAL
+        constraints: [DEFAULT 0.0, CHECK (progress_percentage >= 0.0 AND progress_percentage <= 100.0)]
+      - name: current_step_id
+        type: INTEGER
+      - name: total_steps
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 0]
+      - name: completed_steps
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 0]
+      - name: failed_steps
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 0]
+      - name: skipped_steps
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 0]
+      - name: start_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: end_timestamp
+        type: DATETIME
+      - name: duration_seconds
+        type: REAL
+      - name: input_data_path
+        type: TEXT
+      - name: output_data_path
+        type: TEXT
+      - name: execution_config
+        type: TEXT  # JSON object with execution configuration
+      - name: error_message
+        type: TEXT
+      - name: warnings_count
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 0]
+      - name: executed_by
+        type: TEXT
+      - name: execution_environment
+        type: TEXT  # JSON object with environment info
+    constraints:
+      - type: FOREIGN KEY
+        columns: [pipeline_id]
+        references: pipelines(pipeline_id)
+      - type: FOREIGN KEY
+        columns: [current_step_id]
+        references: pipeline_steps(step_id)
+    indexes:
+      - name: idx_executions_pipeline
+        columns: [pipeline_id]
+      - name: idx_executions_status
+        columns: [status]
+      - name: idx_executions_uuid
+        columns: [execution_uuid]
+      - name: idx_executions_start
+        columns: [start_timestamp]
+      - name: idx_executions_project
+        columns: [project_id]
+
+  # --- Step Executions ---
+  step_executions:
+    description: "Individual step execution details"
+    columns:
+      - name: step_execution_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: execution_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: step_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: status
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT 'pending', CHECK (status IN ('pending', 'running', 'completed', 'failed', 'skipped', 'cancelled'))]
+      - name: start_timestamp
+        type: DATETIME
+      - name: end_timestamp
+        type: DATETIME
+      - name: duration_seconds
+        type: REAL
+      - name: exit_code
+        type: INTEGER
+      - name: stdout_log
+        type: TEXT
+      - name: stderr_log
+        type: TEXT
+      - name: input_files
+        type: TEXT  # JSON array of input file paths
+      - name: output_files
+        type: TEXT  # JSON array of output file paths
+      - name: processed_file_count
+        type: INTEGER
+        constraints: [DEFAULT 0]
+      - name: error_message
+        type: TEXT
+      - name: warnings
+        type: TEXT  # JSON array of warning messages
+      - name: performance_metrics
+        type: TEXT  # JSON object with performance data
+      - name: memory_usage_mb
+        type: REAL
+      - name: cpu_usage_percent
+        type: REAL
+    constraints:
+      - type: FOREIGN KEY
+        columns: [execution_id]
+        references: pipeline_executions(execution_id)
+        on_delete: CASCADE
+      - type: FOREIGN KEY
+        columns: [step_id]
+        references: pipeline_steps(step_id)
+      - type: UNIQUE
+        columns: [execution_id, step_id]
+    indexes:
+      - name: idx_step_executions_execution
+        columns: [execution_id]
+      - name: idx_step_executions_step
+        columns: [step_id]
+      - name: idx_step_executions_status
+        columns: [status]
+      - name: idx_step_executions_start
+        columns: [start_timestamp]
+
+  # --- Pipeline Templates ---
+  pipeline_templates:
+    description: "Reusable pipeline templates and patterns"
+    columns:
+      - name: template_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: name
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: description
+        type: TEXT
+      - name: category
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: target_modality
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: template_data
+        type: TEXT  # JSON representation of pipeline structure
+        constraints: [NOT NULL]
+      - name: parameters_schema
+        type: TEXT  # JSON schema for template parameters
+      - name: example_config
+        type: TEXT  # JSON example configuration
+      - name: version
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT '1.0.0']
+      - name: author
+        type: TEXT
+      - name: usage_count
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 0]
+      - name: created_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: last_used_timestamp
+        type: DATETIME
+    indexes:
+      - name: idx_templates_category
+        columns: [category]
+      - name: idx_templates_modality
+        columns: [target_modality]
+      - name: idx_templates_usage
+        columns: [usage_count]
+
+  # --- File Dependencies ---
+  file_dependencies:
+    description: "Track dependencies between files in pipeline executions"
+    columns:
+      - name: dependency_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: execution_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: source_file_path
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: dependent_file_path
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: dependency_type
+        type: TEXT
+        constraints: [NOT NULL, CHECK (dependency_type IN ('input', 'reference', 'derived', 'temporary'))]
+      - name: step_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: created_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+    constraints:
+      - type: FOREIGN KEY
+        columns: [execution_id]
+        references: pipeline_executions(execution_id)
+        on_delete: CASCADE
+      - type: FOREIGN KEY
+        columns: [step_id]
+        references: pipeline_steps(step_id)
+    indexes:
+      - name: idx_dependencies_execution
+        columns: [execution_id]
+      - name: idx_dependencies_source
+        columns: [source_file_path]
+      - name: idx_dependencies_dependent
+        columns: [dependent_file_path]
+      - name: idx_dependencies_step
+        columns: [step_id]
+
+# --- Database Views ---
+views:
+  pipeline_summary:
+    description: "Summary view of pipelines with execution statistics"
+    query: |
+      SELECT 
+        p.pipeline_id,
+        p.identifier,
+        p.name,
+        p.primary_modality,
+        p.status,
+        p.execution_count,
+        p.last_executed_timestamp,
+        COUNT(ps.step_id) as total_steps,
+        AVG(pe.duration_seconds) as avg_execution_time,
+        MAX(pe.end_timestamp) as last_completion
+      FROM pipelines p
+      LEFT JOIN pipeline_steps ps ON p.pipeline_id = ps.pipeline_id
+      LEFT JOIN pipeline_executions pe ON p.pipeline_id = pe.pipeline_id 
+        AND pe.status = 'completed'
+      GROUP BY p.pipeline_id
+
+  execution_status:
+    description: "Current execution status with step details"
+    query: |
+      SELECT 
+        pe.execution_id,
+        pe.execution_uuid,
+        p.name as pipeline_name,
+        pe.status,
+        pe.progress_percentage,
+        pe.current_step_id,
+        ps.step_name as current_step_name,
+        pe.start_timestamp,
+        pe.completed_steps,
+        pe.total_steps,
+        pe.failed_steps
+      FROM pipeline_executions pe
+      JOIN pipelines p ON pe.pipeline_id = p.pipeline_id
+      LEFT JOIN pipeline_steps ps ON pe.current_step_id = ps.step_id
+      WHERE pe.status IN ('pending', 'running', 'paused')
+
+# --- Database Triggers ---
+triggers:
+  increment_execution_count:
+    table: pipeline_executions
+    event: AFTER INSERT
+    action: |
+      UPDATE pipelines 
+      SET execution_count = execution_count + 1,
+          last_executed_timestamp = NEW.start_timestamp
+      WHERE pipeline_id = NEW.pipeline_id;
+
+  update_execution_duration:
+    table: pipeline_executions
+    event: AFTER UPDATE OF end_timestamp
+    action: |
+      UPDATE pipeline_executions 
+      SET duration_seconds = (
+        strftime('%s', NEW.end_timestamp) - strftime('%s', NEW.start_timestamp)
+      )
+      WHERE execution_id = NEW.execution_id AND NEW.end_timestamp IS NOT NULL;
+
+  update_step_execution_duration:
+    table: step_executions
+    event: AFTER UPDATE OF end_timestamp
+    action: |
+      UPDATE step_executions 
+      SET duration_seconds = (
+        strftime('%s', NEW.end_timestamp) - strftime('%s', NEW.start_timestamp)
+      )
+      WHERE step_execution_id = NEW.step_execution_id AND NEW.end_timestamp IS NOT NULL;
+
+# --- Database Indexes for Performance ---
+additional_indexes:
+  - name: idx_pipelines_full_text
+    table: pipelines
+    type: FULL_TEXT
+    columns: [name, description, notes]
+  
+  - name: idx_executions_date_range
+    table: pipeline_executions
+    columns: [start_timestamp, end_timestamp]
+  
+  - name: idx_step_executions_performance
+    table: step_executions
+    columns: [duration_seconds, memory_usage_mb, cpu_usage_percent]

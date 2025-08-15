@@ -1,0 +1,87 @@
+{
+  "name": "heritage-data-processor",
+  "version": "0.1.0-alpha.1",
+  "description": "Desktop & Server Application to process and persistently store digital heritage data using constructed pipelines",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "start:alpha": "electron . -- --enable-alpha-features",
+    "build": "electron-builder",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Digital-Humanities-Jena/heritage-data-processor.git"
+  },
+  "keywords": [
+    "digital heritage",
+    "data processing"
+  ],
+  "author": {
+    "name": "Dominik Ukolov",
+    "email": "dominik.ukolov@gmail.com"
+  },
+  "license": "GPL-3.0-or-later",
+  "bugs": {
+    "url": "https://github.com/Digital-Humanities-Jena/heritage-data-processor/issues"
+  },
+  "homepage": "https://github.com/Digital-Humanities-Jena/heritage-data-processor#readme",
+  "devDependencies": {
+    "electron": "^36.3.2",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.heritagedataprocessor.app",
+    "productName": "Heritage Data Processor",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "./packaged_python_backend/",
+        "to": "python_backend",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "./server_app/data/",
+        "to": "data",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "./pipeline_components/",
+        "to": "pipeline_components",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "src/assets/images/icon.icns"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "src/assets/images/icon.ico"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "icon": "src/assets/images/icon.png"
+    }
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0",
+    "node-fetch": "^2.7.0",
+    "showdown": "^2.1.0"
+  }
+}

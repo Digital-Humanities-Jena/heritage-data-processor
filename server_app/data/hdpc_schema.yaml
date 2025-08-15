@@ -1,0 +1,480 @@
+# ==========================================
+# Heritage Data Processor Container (.hdpc) DB Schema
+# ==========================================
+
+tables:
+  # --- Project Metadata ---
+  project_info:
+    columns:
+      - name: project_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: project_name
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: project_short_code
+        type: TEXT
+        constraints: [NOT NULL, UNIQUE]
+      - name: description
+        type: TEXT
+      - name: creation_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: last_modified_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: hdpc_schema_version
+        type: TEXT
+        constraints: [NOT NULL]
+    triggers:
+      - name: update_project_last_modified
+        event: AFTER UPDATE
+        action: "UPDATE project_info SET last_modified_timestamp = CURRENT_TIMESTAMP WHERE project_id = NEW.project_id;"
+
+  # --- Configuration (enhanced) ---
+  project_configuration:
+    columns:
+      - name: config_id  # Added primary key
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: project_id  # Added project reference
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: config_key
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: config_value
+        type: TEXT
+      - name: description
+        type: TEXT
+    constraints:
+      - type: FOREIGN KEY
+        columns: [project_id]
+        references: project_info(project_id)
+      - type: UNIQUE  # Ensure unique keys per project
+        columns: [project_id, config_key]
+
+  # --- Source files with enhanced relationships ---
+  source_files:
+    columns:
+      - name: file_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: project_id  # Added project reference
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: absolute_path
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: relative_path
+        type: TEXT
+      - name: filename
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: size_bytes
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: sha256_hash
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: mime_type
+        type: TEXT
+      - name: file_type  # Added classification (source, derived, etc.)
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT 'source']
+      - name: parent_file_id  # Added reference to parent file
+        type: INTEGER
+      - name: status
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT 'pending']
+      - name: added_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: last_processed_timestamp
+        type: DATETIME
+      - name: error_message
+        type: TEXT
+      - name: generated_by_pipeline_step_id
+        type: INTEGER
+        constraints: [NULLABLE]
+    constraints:
+      - type: FOREIGN KEY
+        columns: [project_id]
+        references: project_info(project_id)
+      - type: FOREIGN KEY
+        columns: [parent_file_id]
+        references: source_files(file_id)
+      - type: FOREIGN KEY
+        columns: [generated_by_pipeline_step_id]
+        references: project_pipelines(pipeline_step_id)
+    indexes:
+      - name: idx_source_files_status
+        columns: [status]
+      - name: idx_source_files_path
+        columns: [absolute_path]
+      - name: idx_source_files_parent
+        columns: [parent_file_id]
+      - name: idx_source_files_type
+        columns: [file_type]
+      - name: idx_source_files_hash
+        columns: [sha256_hash]
+      - name: idx_source_files_generated_by_step
+        columns: [generated_by_pipeline_step_id]
+
+  # --- Batch Operations (new table) ---
+  batches:
+    columns:
+      - name: batch_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: project_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: batch_name
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: batch_description
+        type: TEXT
+      - name: created_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: status  # e.g., 'pending', 'in_progress', 'completed', 'error'
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT 'pending']
+      - name: completion_percentage  # Track progress
+        type: REAL
+        constraints: [DEFAULT 0]
+    constraints:
+      - type: FOREIGN KEY
+        columns: [project_id]
+        references: project_info(project_id)
+      - type: UNIQUE
+        columns: [project_id, batch_name]
+
+  # --- Metadata Mappings (new table) ---
+  metadata_mapping_files:
+    columns:
+      - name: mapping_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: project_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: mapping_name
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: file_path  # Path to Excel/CSV mapping file
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: file_format  # 'excel', 'csv', etc.
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: column_definitions  # JSON describing column meanings
+        type: TEXT
+        constraints: [NOT NULL]  # {"A": "title", "B": "keywords", etc.}
+      - name: created_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: last_used_timestamp
+        type: DATETIME
+    constraints:
+      - type: FOREIGN KEY
+        columns: [project_id]
+        references: project_info(project_id)
+      - type: UNIQUE
+        columns: [project_id, mapping_name]
+
+  # --- Extracted Metadata Values (new table) ---
+  metadata_values:
+    columns:
+      - name: value_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: source_file_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: mapping_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: field_name  # e.g., 'title', 'description'
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: field_value  # Extracted value from mapping file
+        type: TEXT
+      - name: extracted_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+    constraints:
+      - type: FOREIGN KEY
+        columns: [source_file_id]
+        references: source_files(file_id)
+      - type: FOREIGN KEY
+        columns: [mapping_id]
+        references: metadata_mapping_files(mapping_id)
+      - type: UNIQUE
+        columns: [source_file_id, mapping_id, field_name]
+    indexes:
+      - name: idx_metadata_values_file
+        columns: [source_file_id]
+      - name: idx_metadata_values_field
+        columns: [field_name]
+
+  # --- Zenodo Records (enhanced) ---
+  zenodo_records:
+    columns:
+      - name: record_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: project_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: batch_id  # Added batch reference
+        type: INTEGER
+      - name: source_file_id  # Primary source file for this record
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: mapping_id  # Metadata mapping used
+        type: INTEGER
+      - name: zenodo_record_id
+        type: INTEGER
+        constraints: [UNIQUE]
+      - name: zenodo_doi
+        type: TEXT
+        constraints: [UNIQUE]
+      - name: concept_doi
+        type: TEXT
+      - name: record_title
+        type: TEXT
+      - name: record_metadata_json  # Complete metadata as JSON
+        type: TEXT
+      - name: file_data_json
+        type: TEXT
+      - name: record_status
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT 'draft']
+      - name: is_sandbox
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 1]
+      - name: version  # Added version tracking
+        type: INTEGER
+        constraints: [DEFAULT 1]
+      - name: previous_version_id  # Reference to previous version
+        type: INTEGER
+      - name: creation_api_response
+        type: TEXT
+      - name: last_publish_api_response
+        type: TEXT
+      - name: last_api_error
+        type: TEXT
+      - name: created_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: last_updated_timestamp
+        type: DATETIME
+    constraints:
+      - type: FOREIGN KEY
+        columns: [project_id]
+        references: project_info(project_id)
+      - type: FOREIGN KEY
+        columns: [batch_id]
+        references: batches(batch_id)
+      - type: FOREIGN KEY
+        columns: [source_file_id]
+        references: source_files(file_id)
+      - type: FOREIGN KEY
+        columns: [mapping_id]
+        references: metadata_mapping_files(mapping_id)
+      - type: FOREIGN KEY
+        columns: [previous_version_id]
+        references: zenodo_records(record_id)
+    indexes:
+      - name: idx_zenodo_records_status
+        columns: [record_status, is_sandbox]
+      - name: idx_zenodo_records_zid
+        columns: [zenodo_record_id]
+      - name: idx_zenodo_records_batch
+        columns: [batch_id]
+      - name: idx_zenodo_records_source
+        columns: [source_file_id]
+
+  # --- Record Files Mapping (enhanced) ---
+  record_files_map:
+    columns:
+      - name: map_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: record_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: file_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: file_path
+        type: TEXT
+      - name: file_purpose  # Added to indicate file role
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT 'main']  # main, thumbnail, metadata, etc.
+      - name: zenodo_file_id
+        type: TEXT
+        constraints: [UNIQUE]
+      - name: upload_status
+        type: TEXT
+        constraints: [NOT NULL, DEFAULT 'pending']
+      - name: upload_timestamp
+        type: DATETIME
+      - name: upload_error
+        type: TEXT
+    constraints:
+      - type: FOREIGN KEY
+        columns: [record_id]
+        references: zenodo_records(record_id)
+      - type: FOREIGN KEY
+        columns: [file_id]
+        references: source_files(file_id)
+      - type: UNIQUE
+        columns: [record_id, file_id]
+    indexes:
+      - name: idx_record_files_map_record
+        columns: [record_id]
+      - name: idx_record_files_map_file
+        columns: [file_id]
+      - name: idx_record_files_map_status
+        columns: [upload_status]
+
+  # --- Pipeline Configuration ---
+  project_pipelines:
+    columns:
+      - name: pipeline_step_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: project_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: modality
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: component_name # Internal name, can now be repeated for same project/modality
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: component_order # Execution order for this modality
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: parameters
+        type: TEXT
+      - name: is_active
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 1]
+      - name: last_modified_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+    constraints:
+      - type: FOREIGN KEY
+        columns: [project_id]
+        references: project_info(project_id)
+      - type: UNIQUE # Ensures a component appears at most once at a specific order
+        columns: [project_id, modality, component_order]
+    indexes:
+      - name: idx_project_pipelines_project_modality
+        columns: [project_id, modality]
+    triggers:
+      - name: update_pipeline_last_modified
+        event: AFTER UPDATE
+        action: "UPDATE project_pipelines SET last_modified_timestamp = CURRENT_TIMESTAMP WHERE pipeline_step_id = NEW.pipeline_step_id;"
+
+  # --- API Log (enhanced) ---
+  api_log:
+    columns:
+      - name: log_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: project_id  # Added project reference
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: record_id
+        type: INTEGER
+      - name: file_id
+        type: INTEGER
+      - name: batch_id  # Added batch reference
+        type: INTEGER
+      - name: http_method
+        type: TEXT
+      - name: endpoint_url
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: request_headers
+        type: TEXT
+      - name: request_body
+        type: TEXT
+      - name: response_status_code
+        type: INTEGER
+      - name: response_headers
+        type: TEXT
+      - name: response_body
+        type: TEXT
+      - name: duration_ms
+        type: INTEGER
+      - name: status
+        type: TEXT
+    constraints:
+      - type: FOREIGN KEY
+        columns: [project_id]
+        references: project_info(project_id)
+      - type: FOREIGN KEY
+        columns: [record_id]
+        references: zenodo_records(record_id)
+      - type: FOREIGN KEY
+        columns: [file_id]
+        references: source_files(file_id)
+      - type: FOREIGN KEY
+        columns: [batch_id]
+        references: batches(batch_id)
+    indexes:
+      - name: idx_api_log_project
+        columns: [project_id]
+      - name: idx_api_log_timestamp
+        columns: [timestamp]
+      - name: idx_api_log_record
+        columns: [record_id]
+      - name: idx_api_log_status
+        columns: [status]
+
+  # --- API Credentials (new table) ---
+  api_credentials:
+    columns:
+      - name: credential_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: project_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: credential_name
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: credential_type  # 'zenodo_api_key', etc.
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: credential_value  # Consider encryption
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: is_sandbox
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 1]
+      - name: created_timestamp
+        type: DATETIME
+        constraints: [NOT NULL, DEFAULT CURRENT_TIMESTAMP]
+      - name: expiration_timestamp
+        type: DATETIME
+    constraints:
+      - type: FOREIGN KEY
+        columns: [project_id]
+        references: project_info(project_id)
+      - type: UNIQUE
+        columns: [project_id, credential_name, is_sandbox]
+
+# --- Schema Version ---
+schema_info:
+  version: "0.1.0"
+  description: "Enhanced schema for Heritage Data Processor Container with metadata mapping and file relationship support"

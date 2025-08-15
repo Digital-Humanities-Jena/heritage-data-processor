@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heritage Data Processor</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="styles.css"> 
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <header class="bg-white shadow-md sticky top-0 z-50">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <div class="flex items-center">
+                    <!-- Mobile toggle -->
+                    <button id="sidebarToggle" class="md:hidden mr-3 p-2 text-gray-600 hover:text-gray-800">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                    </button>
+
+                    <!-- Back/Forward Buttons -->
+                    <div class="hidden md:flex items-center mr-3 border-r border-gray-300 pr-3">
+                        <button id="navigationBackBtn" class="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200" title="Go Back" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" />
+                            </svg>
+                        </button>
+                        <button id="navigationForwardBtn" class="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors duration-200" title="Go Forward" disabled>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                    </div>
+                    
+                    <!-- Desktop Sidebar Toggle Button -->
+                    <button id="desktopSidebarToggle" class="hidden md:block mr-4 p-2 text-gray-500 hover:text-gray-800 rounded-full hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500" title="Toggle Sidebar">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 transition-transform duration-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                        </svg>
+                    </button>
+                    
+                    <!-- App Title -->
+                    <svg class="h-8 w-8 text-blue-600 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" /></svg>
+                    <h1 class="text-xl md:text-2xl font-semibold text-gray-700">Heritage Data Processor</h1>
+                </div>
+
+                <div class="flex items-center">
+                    <button id="pipelineComponentsBtn" title="Pipeline Components" class="p-2 text-gray-600 hover:text-gray-800 mr-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                        <path fill-rule="evenodd" d="M3.75 6a.75.75 0 01.75-.75h15a.75.75 0 010 1.5h-15A.75.75 0 013.75 6zM3 12a.75.75 0 01.75-.75h15a.75.75 0 010 1.5h-15A.75.75 0 013 12zm0 5.25a.75.75 0 01.75-.75h15a.75.75 0 010 1.5h-15a.75.75 0 01-.75-.75z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+
+                    <button id="pipelineConstructorBtn" class="p-2 text-gray-600 hover:text-gray-800">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+                        </svg>
+                    </button>
+
+                    <button id="modelsBtn" title="Manage Models" class="p-2 text-gray-600 hover:text-gray-800 mr-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75l3 3 3-3" /> </svg>
+                    </button>
+                    
+                    <button id="operabilityBtn" title="Operability Tests" class="p-2 text-gray-600 hover:text-gray-800 mr-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </button>
+
+                    <button id="settingsBtn" class="p-2 text-gray-600 hover:text-gray-800">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.646.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 1.255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.333.183-.582.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-1.255c.007-.378-.137-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <aside id="sidebar" class="bg-white shadow-lg p-4 h-full">
+            <nav>
+                <a href="#" class="nav-link active" data-view="dashboard"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3v11.25A2.25 2.25 0 006 16.5h12A2.25 2.25 0 0020.25 14.25V3M3.75 21h16.5M16.5 3.75h.008v.008H16.5V3.75z" /></svg>Dashboard</a>
+                <a href="#" class="nav-link" data-view="files"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" /></svg>Files</a>
+                <a href="#" class="nav-link" data-view="pipeline"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" /></svg>Pipeline</a>
+                <a href="#" class="nav-link" data-view="config"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.646.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 1.255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.333.183-.582.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-1.255c.007-.378-.137-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>Configuration</a>
+                <a href="#" class="nav-link" data-view="batches"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10.5 11.25h3M12 15V3.75m0 0l-3.75 3.75M12 3.75l3.75 3.75" /></svg>Batches</a>
+                <a href="#" class="nav-link" data-view="mappings"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>Mappings</a>
+                <a href="#" class="nav-link" data-view="apilog"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h18M16.5 3l4.5 4.5M16.5 3L12 7.5M16.5 3H3" /></svg>API Log</a>
+                <a href="#" class="nav-link" data-view="credentials"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 013 3m3 0a6 6 0 01-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1121.75 8.25z" /></svg>Credentials</a>
+                <a href="#" class="nav-link" data-view="uploads">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l-3 3m3-3l3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.338 0 4.5 4.5 0 01-1.41 8.775H6.75z" /></svg>
+                    Uploads
+                </a>
+            </nav>
+        </aside>
+
+        <main id="mainContent" class="p-4 md:p-8">
+            <div id="hdpcContentsDisplay" class="hidden">
+                <div id="view-dashboard" class="view-section active">
+                    <div class="card mb-6">
+                        <div class="flex justify-between items-start">
+                            <div class="flex items-center gap-2">
+                                <h2 id="overviewProjectName" class="text-2xl font-bold text-gray-800"></h2>
+                                <button id="editProjectTitleBtn" class="text-gray-500 hover:text-blue-600 p-1 rounded-full">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 5.232z"></path></svg>
+                                </button>
+                            </div>
+                            <button id="editProjectDescriptionBtn" class="text-gray-500 hover:text-blue-600 p-1 rounded-full">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L14.732 5.232z"></path></svg>
+                            </button>
+                        </div>
+                         <p id="overviewDescription" class="text-gray-600 mt-1"></p>
+                        <div class="mt-2"><p class="text-sm text-gray-500">Schema Version</p><p id="overviewSchemaVersion" class="font-medium"></p></div>
+                    </div>
+
+                    <div class="card mb-6">
+                        <h3 class="text-xl font-semibold mb-4">Project Statistics</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                            <div>
+                                <p class="text-2xl font-bold text-gray-800" id="statsTotalFiles">0</p>
+                                <p class="text-sm text-gray-500">Total Files</p>
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-gray-800" id="statsFilesWithMetadata">0</p>
+                                <p class="text-sm text-gray-500">Files with Metadata</p>
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-green-600" id="statsSandboxRecords">0 / 0</p>
+                                <p class="text-sm text-gray-500">Sandbox (Drafts/Published)</p>
+                            </div>
+                            <div>
+                                <p class="text-2xl font-bold text-red-600" id="statsProductionRecords">0 / 0</p>
+                                <p class="text-sm text-gray-500">Production (Drafts/Published)</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 space-y-6">
+
+                            <div class="card">
+                                <div class="flex justify-between items-center mb-4">
+                                    <h3 class="text-xl font-semibold">Latest Published Records</h3>
+                                    <button id="viewAllPublishedBtn" class="btn-secondary text-sm py-1 px-3">View All</button>
+                                </div>
+                                <div id="latestPublishedList" class="space-y-2">
+                                    <p class="text-gray-500">No published records found.</p>
+                                </div>
+                            </div>
+
+                        </div>
+
+                        <div class="space-y-6">
+                            <div class="card">
+                                <h3 class="text-xl font-semibold mb-2">Metadata Mapping</h3>
+                                <p id="mappingStatusText" class="text-sm mb-4"></p>
+                                <div id="mappingActionsContainer" class="flex flex-col space-y-2">
+                                    <button id="configureMappingBtn" class="btn-primary">Configure Mapping</button>
+                                    <button id="viewMappingBtn" class="btn-secondary hidden">View Mapping</button>
+                                    <button id="reconfigureMappingBtn" class="btn-primary hidden">Reconfigure</button>
+                                </div>
+                            </div>
+                            <div id="pipelineCard" class="card">
+                                <h3 class="text-xl font-semibold mb-4">Pipeline Steps</h3>
+                                <div id="pipelineSteps" class="space-y-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="view-files" class="view-section">
+                    <div class="mt-6 border-t pt-4">
+                        <h3 class="text-md font-semibold text-gray-600 mb-2">Add New Source Files</h3>
+                        <div class="flex space-x-2">
+                            <button type="button" id="addSourceFilesBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md text-sm">
+                                Add File(s)
+                            </button>
+                            <button type="button" id="addSourceDirectoryBtn" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md text-sm">
+                                Add Directory
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-gray-700">Source Files (<span id="fileCount">0</span>)</h2>
+                            <input type="text" id="fileSearchInput" placeholder="Search filenames..." class="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <div id="metadataFiles" class="space-y-2 max-h-[60vh] overflow-y-auto pr-2"></div>
+                        <div id="filesPaginationControls" class="pagination-controls mt-4 flex justify-between items-center">
+                            <button id="prevFilesPage">Previous</button>
+                            <span id="filesPageInfo"></span>
+                            <button id="nextFilesPage">Next</button>
+                        </div>
+                        <p id="noFilesMessage" class="text-gray-500 hidden mt-2">No files found in the database.</p>
+                    </div>
+                </div>
+
+                <div id="view-pipeline" class="view-section">
+                     <div class="card" id="pipelineCard">
+                        <h2 class="text-xl font-semibold mb-4 text-gray-700">Pipeline Steps</h2>
+                        <div id="pipelineSteps" class="space-y-2  max-h-[70vh] overflow-y-auto pr-2"></div>
+                        <p id="noPipelineMessage" class="text-gray-500 hidden">No pipeline steps found.</p>
+                    </div>
+                </div>
+
+                <div id="view-config" class="view-section">
+                     <div class="card" id="configCard">
+                        <h2 class="text-xl font-semibold mb-4 text-gray-700">Project Configuration</h2>
+                        <pre id="hdpcConfig" class="bg-gray-50 p-3 rounded-md text-sm overflow-x-auto max-h-[70vh]"></pre>
+                        <p id="noConfigMessage" class="text-gray-500 hidden">No configuration found.</p>
+                    </div>
+                </div>
+                
+                <div id="view-batches" class="view-section">
+                    <div class="card" id="batchesCard">
+                        <h2 class="text-xl font-semibold mb-4 text-gray-700">Batches (<span id="batchCount">0</span>)</h2>
+                        <div id="batchesList" class="space-y-2 max-h-[70vh] overflow-y-auto pr-2"></div>
+                        <p id="noBatchesMessage" class="text-gray-500 hidden">No batches found.</p>
+                    </div>
+                </div>
+
+                <div id="view-mappings" class="view-section">
+                     <div class="card" id="mappingsCard">
+                        <h2 class="text-xl font-semibold mb-4 text-gray-700">Metadata Mappings (<span id="mappingCount">0</span>)</h2>
+                        <div id="mappingsList" class="space-y-3 max-h-[70vh] overflow-y-auto pr-2"></div>
+                        <p id="noMappingsMessage" class="text-gray-500 hidden">No metadata mappings found.</p>
+                    </div>
+                </div>
+
+                <div id="view-apilog" class="view-section">
+                    <div class="card" id="apiLogCard">
+                        <h2 class="text-xl font-semibold mb-4 text-gray-700">API Log Entries (<span id="apiLogCount">0</span>)</h2>
+                        <div id="apiLogList" class="space-y-2 max-h-[60vh] overflow-y-auto pr-2"></div>
+                        <div id="apiLogPaginationControls" class="pagination-controls mt-4 flex justify-between items-center">
+                            <button id="prevApiLogPage">Previous</button>
+                            <span id="apiLogPageInfo"></span>
+                            <button id="nextApiLogPage">Next</button>
+                        </div>
+                        <p id="noApiLogMessage" class="text-gray-500 hidden mt-2">No API log entries found.</p>
+                    </div>
+                </div>
+
+                <div id="view-credentials" class="view-section">
+                    <div class="card" id="credentialsCard">
+                        <h2 class="text-xl font-semibold mb-4 text-gray-700">API Credentials (<span id="credentialCount">0</span>)</h2>
+                        <div id="credentialsList" class="space-y-2 max-h-[70vh] overflow-y-auto pr-2"></div>
+                        <p id="noCredentialsMessage" class="text-gray-500 hidden">No API credentials found.</p>
+                    </div>
+                </div>
+
+                <div id="view-uploads" class="view-section">
+                    <div class="card">
+                        <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <div class="flex items-center space-x-4">
+                                <div>
+                                    <label for="uploadsEnvToggle" class="text-sm font-medium text-gray-700 mr-1">View Records For:</label>
+                                    <select id="uploadsEnvToggle" class="p-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="sandbox" selected>Sandbox</option>
+                                        <option value="production">Production</option>
+                                    </select>
+                                </div>
+                                <div class="border-l pl-4">
+                                    <label for="uploadsCreateEnvToggle" class="text-sm font-medium text-gray-700 mr-1">Target for New Records:</label>
+                                    <select id="uploadsCreateEnvToggle" class="p-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="sandbox" selected>Sandbox (Default)</option>
+                                        <option value="production" id="createInProductionOption" style="color: #D32F2F; font-weight: bold;">Production (Live!)</option>
+                                    </select>
+                                    <span id="productionWarning" class="text-xs text-red-600 font-semibold ml-2 hidden">⚠️ CAUTION: PRODUCTION!</span>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button type="button" id="uploadsViewAddFilesBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-3 rounded-md text-sm">
+                                    Add File(s)
+                                </button>
+                                <button type="button" id="uploadsViewAddDirectoryBtn" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-3 rounded-md text-sm">
+                                    Add Directory
+                                </button>
+                            </div>
+                            <button id="refreshUploadsViewBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white text-sm py-2 px-3 rounded-md">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2a8.001 8.001 0 0015.357 2M9 15h4.581" /></svg>
+                                Refresh View
+                            </button>
+                        </div>
+
+                        <div class="border-b border-gray-200 mb-4">
+                            <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                                <button data-tab-id="pending_preparation" class="uploads-tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-blue-600 border-blue-600">
+                                    Prepare Metadata (<span id="pendingPrepCount">0</span>)
+                                </button>
+                                <button data-tab-id="pending_operations" class="uploads-tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">
+                                    Create Draft (<span id="pendingOpsCount">0</span>) </button>
+                                <button data-tab-id="drafts" class="uploads-tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">
+                                    Manage Drafts (<span id="draftsCount">0</span>)
+                                </button>
+                                <button data-tab-id="published" class="uploads-tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">
+                                    Published (<span id="publishedCount">0</span>)
+                                </button>
+                                <button data-tab-id="versioning" class="uploads-tab-btn whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 border-transparent">
+                                    Versioning (<span id="versioningCount">0</span>)
+                                </button>
+                            </nav>
+                        </div>
+
+                        <div id="uploadsBatchActionsContainer" class="hidden mb-4 p-3 bg-gray-50 rounded-md border flex items-center gap-4">
+                            <div class="flex items-center">
+                                <input id="selectAllItemsCheckbox" type="checkbox" class="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                                <label for="selectAllItemsCheckbox" class="ml-2 text-sm font-medium text-gray-700">Select All</label>
+                            </div>
+                            <div id="selectedItemsCount" class="text-sm text-gray-600">0 item(s) selected.</div>
+                            <div class="flex-grow"></div>
+                            <div class="flex items-center gap-2">
+                                <select id="uploadsBatchActionDropdown" class="p-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-blue-500 focus:border-blue-500" disabled>
+                                    <option value="">-- Select Batch Action --</option>
+                                </select>
+                                <button id="executeBatchActionBtn" class="btn-primary text-sm py-2 px-3" disabled>Execute</button>
+                            </div>
+                        </div>
+
+                        <!-- Pipeline Selection Section - Only visible for pending_operations tab -->
+                        <div id="pipelineSelectionSection" class="hidden mb-4 p-4 bg-blue-50 rounded-md border border-blue-200">
+                            <div class="flex items-center gap-4">
+                                <div class="flex-grow">
+                                    <label for="pipelineDropdown" class="block text-sm font-medium text-gray-700 mb-2">Select Pipeline for Execution</label>
+                                    <select id="pipelineDropdown" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                        <option value="">-- Select a pipeline --</option>
+                                    </select>
+                                </div>
+                                <div class="flex flex-col gap-2 pt-6">
+                                    <button id="viewInConstructorBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium py-2 px-4 rounded-md disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                                        View in Constructor
+                                    </button>
+                                    <button id="initiatePipelineExecutionBtn" class="bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium py-2 px-4 rounded-md disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                                        Initiate Pipeline Execution
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="newVersionPipelineSection" class="p-4 mb-4 border rounded-lg bg-gray-50 hidden">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-2">New Version Pipeline</h3>
+                            <p class="text-sm text-gray-600 mb-4">Select published records below, choose a pipeline, and configure file handling to create new versions.</p>
+                            <div class="flex items-center gap-4">
+                                <div class="flex-grow">
+                                    <label for="newVersionPipelineSelect" class="block text-sm font-medium text-gray-700 mb-1">Select Pipeline</label>
+                                    <select id="newVersionPipelineSelect" class="w-full p-2 border rounded-md bg-white"></select>
+                                </div>
+                                <div class="flex-shrink-0 pt-6">
+                                    <button id="initiateNewVersionBtn" class="btn-primary" disabled>Create New Version(s)</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="uploadsTabContent_pending_preparation" class="uploads-tab-pane space-y-3 max-h-[60vh] overflow-y-auto pr-2"></div>
+                        <div id="uploadsTabContent_pending_operations" class="uploads-tab-pane space-y-3 hidden max-h-[60vh] overflow-y-auto pr-2"></div> <div id="uploadsTabContent_drafts" class="uploads-tab-pane space-y-3 hidden max-h-[60vh] overflow-y-auto pr-2"></div>
+                        <div id="uploadsTabContent_published" class="uploads-tab-pane space-y-3 hidden max-h-[60vh] overflow-y-auto pr-2"></div>
+                        <div id="uploadsTabContent_versioning" class="uploads-tab-pane space-y-3 hidden max-h-[60vh] overflow-y-auto pr-2"></div>
+
+                        <p id="noUploadsMessage" class="text-gray-500 hidden mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+                            </p>
+                    </div>
+                </div>
+
+            </div>
+
+            <div id="view-pipeline-constructor" class="view-section">
+                <div class="card">
+                    <div class="mb-4">
+                        <h2 class="text-xl font-semibold text-gray-700">Pipeline Constructor</h2>
+                        <p class="text-sm text-gray-500 mt-1">Build custom processing workflows</p>
+                    </div>
+
+                    <div class="pipeline-selector-section">
+                        <div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6 items-end">
+
+                            <div class="md:col-span-3">
+                                <label class="block text-sm font-medium text-gray-700 mb-2">Load Existing Pipeline</label>
+                                <select id="existingPipelineMainSelect" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <option value="">Select a pipeline...</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <button id="duplicatePipelineBtn" class="btn-secondary w-full flex items-center justify-center" disabled>
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 01-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 011.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 00-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 01-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 00-3.375-3.375h-1.5a1.125 1.125 0 01-1.125-1.125v-1.5a3.375 3.375 0 00-3.375-3.375H9.75" />
+                                    </svg>
+                                    Duplicate
+                                </button>
+                            </div>
+
+                            <div>
+                                <button id="importPipelineMainBtn" class="btn-secondary w-full">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path>
+                                    </svg>
+                                    Import YAML
+                                </button>
+                            </div>
+
+                            <div>
+                                <button id="newPipelineMainBtn" class="btn-primary w-full text-sm">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path>
+                                    </svg>
+                                    New Pipeline
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Pipeline Constructor Main View Container -->
+                    <div id="pipelineConstructorMainView" class="pipeline-constructor-main-view min-h-[600px]">
+                        <!-- Pipeline constructor content will be loaded here -->
+                        <div class="flex items-center justify-center h-64 border-2 border-dashed border-gray-300 rounded-lg">
+                            <div class="text-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1" stroke="currentColor" class="w-16 h-16 mx-auto text-gray-400 mb-4">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z" />
+                                </svg>
+                                <h3 class="text-lg font-medium text-gray-700 mb-2">No Pipeline Selected</h3>
+                                <p class="text-gray-500 mb-4">Create a new pipeline or select an existing one to get started</p>
+                                <button id="startConstructorBtn" class="btn-primary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                    </svg>
+                                    Start Building
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <div id="view-pipeline-components" class="view-section hidden">
+                <div class="card">
+                    <div id="pipelineComponentsContainer" class="space-y-4">
+                        </div>
+                </div>
+            </div>
+            
+            <div id="noFileLoaded" class="card text-center">
+                <h2 class="text-2xl font-bold text-gray-800 mb-2">Welcome to the Alpha-Version of the Heritage Data Processor</h2>
+                <p class="text-gray-600 mb-6">Create Pipelines | Process Digital Cultural Heritage Data | Publish Data with persistent Identifiers & Storage</p>
+
+                <div class="flex justify-center gap-4 mb-8">
+                    <button id="createNewProjectBtn" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg">
+                        Create New Project
+                    </button>
+                    <button id="selectHdpcFileBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-lg">
+                        Load Existing Project
+                    </button>
+                </div>
+
+                <div id="recentProjectsContainer" class="text-left">
+                    <h3 class="text-lg font-semibold text-gray-700 mb-3 border-b pb-2">Recent Projects</h3>
+                    <ul id="recentProjectsList" class="space-y-2">
+                        <li class="text-gray-500">No recent projects.</li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="toast-message" class="hidden"></div>
+
+    <button id="showLogBtn" class="fixed bottom-4 left-4 bg-gray-700 hover:bg-gray-800 text-white font-bold py-3 px-4 rounded-full shadow-lg z-50">
+        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+        </svg>
+    </button>
+
+    <div id="logModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="log-modal-content bg-white rounded-lg shadow-2xl w-4/5 h-4/5 flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-xl font-semibold">Global Application Log</h3>
+                <button id="closeLogModalBtn" class="text-gray-500 hover:text-gray-800">&times;</button>
+            </div>
+            <pre id="logContent" class="flex-grow p-4 bg-gray-800 text-white text-sm whitespace-pre-wrap overflow-y-auto"></pre>
+        </div>
+    </div>
+
+    <!-- Pipeline Components Modals (Info & Options aka Parameters)-->
+    <div id="infoModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="infoModalTitle" class="text-xl font-semibold text-gray-800">Component Information</h3>
+                <button id="closeInfoModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="infoModalBody" class="p-6 overflow-y-auto">
+                </div>
+        </div>
+    </div>
+
+    <div id="optionsModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="optionsModalTitle" class="text-xl font-semibold text-gray-800">Component Options</h3>
+                <button id="closeOptionsModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="optionsModalBody" class="p-6 overflow-y-auto">
+                </div>
+            <div class="flex justify-end items-center p-4 border-t bg-gray-50 rounded-b-lg space-x-3">
+                <button id="closeOptionsModalFooterBtn" class="btn-secondary py-2 px-4">Cancel</button>
+                <button id="saveComponentOptionsBtn" class="btn-primary py-2 px-4">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Component Installation Modal -->
+    <div id="componentInstallModal" class="modal hidden">
+        <div class="modal-overlay">
+            <div class="modal-content component-install-modal">
+                <div class="modal-header">
+                    <h2 class="modal-title" id="installModalTitle">Install Component</h2>
+                    <button class="modal-close" id="closeComponentInstall">×</button>
+                </div>
+                <div class="modal-body">
+                    <!-- Component Info -->
+                    <div class="install-component-info">
+                        <div class="flex items-center gap-3 mb-4 p-3 bg-blue-50 rounded-lg">
+                            <div class="component-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 id="installComponentName" class="font-semibold text-gray-800"></h3>
+                                <p id="installComponentDescription" class="text-sm text-gray-600"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Requirements Check -->
+                    <div class="install-system-checks">
+                        <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            System Requirements
+                        </h4>
+                        <div id="systemChecksContainer" class="space-y-2 mb-4">
+                            <!-- Dynamic system checks will be added here -->
+                        </div>
+                    </div>
+
+                    <!-- Required Files Section -->
+                    <div class="install-required-files">
+                        <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M9 16.5v.75c0 .414.336.75.75.75h1.5M9 16.5h2.25m-2.25 0h.375a1.125 1.125 0 011.125-1.125M2.25 13.5h3.75m-3.75 0h-.375a1.125 1.125 0 00-1.125 1.125v9.75c0 .621.504 1.125 1.125 1.125h9.75c0 .621.504 1.125 1.125 1.125h1.5c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.75z" />
+                            </svg>
+                            Required Files
+                        </h4>
+                        <div id="requiredFilesContainer" class="space-y-4">
+                            <!-- Dynamic required files will be added here -->
+                        </div>
+                    </div>
+
+                    <!-- Optional Files Section -->
+                    <div class="install-optional-files">
+                        <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25M9 16.5v.75c0 .414.336.75.75.75h1.5M9 16.5h2.25m-2.25 0h.375a1.125 1.125 0 011.125-1.125M2.25 13.5h3.75m-3.75 0h-.375a1.125 1.125 0 00-1.125 1.125v9.75c0 .621.504 1.125 1.125 1.125h9.75c0 .621.504 1.125 1.125 1.125h1.5c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.75z" />
+                            </svg>
+                            Optional Files
+                        </h4>
+                        <div id="optionalFilesContainer" class="space-y-4">
+                            <!-- Dynamic optional files will be added here -->
+                        </div>
+                    </div>
+
+                    <!-- Installation Progress -->
+                    <div class="install-progress hidden">
+                        <h4 class="font-semibold text-gray-700 mb-3">Installation Progress</h4>
+                        <div class="progress-bar bg-gray-200 rounded-full h-2 mb-2">
+                            <div id="installProgressBar" class="bg-blue-600 h-2 rounded-full transition-all duration-300" style="width: 0%"></div>
+                        </div>
+                        <div id="installProgressText" class="text-sm text-gray-600">Preparing installation...</div>
+                    </div>
+
+                    <!-- Installation Log -->
+                    <div class="install-log hidden">
+                        <h4 class="font-semibold text-gray-700 mb-3">Installation Log</h4>
+                        <div class="log-viewer">
+                            <pre id="installLogContent" class="log-content"></pre>
+                        </div>
+                    </div>
+
+                    <!-- Action Buttons -->
+                    <div class="install-actions">
+                        <div class="flex justify-between items-center">
+                            <div class="install-status">
+                                <span id="installStatusText" class="text-sm text-gray-600">Ready to install</span>
+                            </div>
+                            <div class="flex gap-3">
+                                <button id="cancelInstallBtn" class="btn-secondary hidden">Cancel</button>
+                                <button id="doneInstallBtn" class="btn-success hidden">Done</button>
+                                <button id="startInstallBtn" class="btn-primary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                                    </svg>
+                                    Install Component
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- Component Run Modal -->
+    <div id="componentRunModal" class="modal hidden">
+        <div class="modal-overlay">
+            <div class="modal-content component-run-modal">
+                <div class="modal-header">
+                    <h2 class="modal-title" id="runModalTitle">Run Component</h2>
+                    
+                    <div class="run-templates-section">
+                        <select id="runTemplateSelector" class="form-select text-sm">
+                            <option value="">- Load Template -</option>
+                        </select>
+                        <div class="template-actions">
+                            <button id="saveTemplateBtn" class="btn-icon" title="Save current parameters as a new template">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" /></svg>
+                            </button>
+                            <button id="importTemplateBtn" class="btn-icon" title="Import template from a YAML file">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 10.5v6m3-3H9m4.06-7.19l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" /></svg>
+                            </button>
+                            <button id="exportTemplateBtn" class="btn-icon" title="Export current parameters to a YAML file">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <button class="modal-close" id="closeComponentRun">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="run-component-info">
+                        <div class="flex items-center gap-3 mb-4 p-3 bg-blue-50 rounded-lg">
+                            <div class="component-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.168 1.168 0 01-1.667-.986V5.653z" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 id="runComponentName" class="font-semibold text-gray-800"></h3>
+                                <p id="runComponentDescription" class="text-sm text-gray-600"></p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="run-inputs-section">
+                        <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15m0-3l-3-3-3 3m6 0l-3-3-3 3m6 0v3" />
+                            </svg>
+                            Input Files & Directories
+                        </h4>
+                        <div id="runInputsContainer" class="space-y-4">
+                            </div>
+                    </div>
+
+                    <div class="run-output-section">
+                        <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+                            </svg>
+                            Output Directory
+                        </h4>
+                        <div class="output-selector">
+                            <div class="flex gap-2">
+                                <input type="text" id="outputDirPath" class="flex-1 px-3 py-2 border border-gray-300 rounded-md" placeholder="Select output directory..." readonly>
+                                <button id="selectOutputDirBtn" class="btn-secondary">Browse</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="run-parameters-section">
+                        <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.646.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 1.255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.333.183-.582.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-1.255c.007-.378-.137-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            Parameters
+                        </h4>
+                        <div id="runParametersContainer" class="space-y-3">
+                            </div>
+                    </div>
+
+                    <div class="run-log-section">
+                        <div class="flex justify-between items-center mb-3">
+                            <h4 class="font-semibold text-gray-700 flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                                </svg>
+                                Execution Log
+                            </h4>
+                            <div class="flex gap-2">
+                                <button id="clearLogBtn" class="btn-ghost text-sm">Clear</button>
+                                <button id="downloadLogBtn" class="btn-ghost text-sm">Download</button>
+                            </div>
+                        </div>
+                        <div class="log-viewer">
+                            <pre id="componentRunLog" class="log-content"></pre>
+                            <div id="logLoader" class="log-loader hidden">
+                                <div class="loader-sm"></div>
+                                <span>Processing...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="run-actions">
+                        <div class="flex justify-between items-center">
+                            <div class="run-status">
+                                <span id="runStatusText" class="text-sm text-gray-600">Ready to run</span>
+                            </div>
+                            <div class="flex gap-3">
+                                <button id="cancelRunBtn" class="btn-secondary hidden">Cancel</button>
+                                <button id="startRunBtn" class="btn-primary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 mr-1">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 010 1.972l-11.54 6.347a1.168 1.168 0 01-1.667-.986V5.653z" />
+                                    </svg>
+                                    Run Component
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    
+    <!-- Models View -->
+    <div id="modelsModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="models-modal-content bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-xl font-semibold text-gray-800">Download & Manage Models</h3>
+                <button id="closeModelsModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="modelsModalBody" class="flex-grow p-6 overflow-y-auto space-y-4">
+                <p id="modelsPathInstruction" class="text-sm text-gray-600"></p>
+                <div id="downloadableModelsList" class="space-y-4">
+                    </div>
+            </div>
+            <div class="flex justify-end items-center p-4 border-t bg-gray-50 rounded-b-lg">
+                <button id="closeModelsModalFooterBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Operability View -->
+    <div id="operabilityModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="settings-modal-content bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-xl font-semibold text-gray-800">Operability Tests</h3>
+                <button id="closeOperabilityModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="operabilityModalBody" class="flex-grow p-6 overflow-y-auto space-y-4">
+                <div class="flex justify-end">
+                    <button id="runAllTestsBtn" class="bg-blue-500 hover:bg-blue-600 text-white font-medium py-2 px-4 rounded-md text-sm">
+                        Run All Tests
+                    </button>
+                </div>
+                <div id="operabilityTestsList" class="space-y-2">
+                    </div>
+                <p id="noOperabilityTestsMessage" class="text-gray-500 hidden mt-2">No operability tests defined or loaded.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="settingsModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
+        <div class="settings-modal-content bg-white rounded-lg shadow-2xl w-full h-full md:w-3/4 md:h-5/6 flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-xl font-semibold">Application Configuration</h3>
+                <button id="closeSettingsModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="settingsFormContainer" class="flex-grow p-6 overflow-y-auto space-y-6">
+                </div>
+            <div class="flex justify-end items-center p-4 border-t bg-gray-50 rounded-b-lg">
+                <button id="cancelSettingsBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-2 px-4 rounded-md mr-2">Cancel</button>
+                <button id="saveSettingsBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Project View -->
+    <div id="newProjectModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="newProjectModalTitle" class="text-xl font-semibold text-gray-800">Create New Heritage Data Processor Project</h3>
+                <button id="closeNewProjectModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+
+            <div id="newProjectModalBody" class="flex-grow p-6 overflow-y-auto space-y-6">
+                <div id="newProjectStep1" class="new-project-step space-y-4">
+                    <div>
+                        <label for="newProjectName" class="block text-sm font-medium text-gray-700">Project Name:</label>
+                        <input type="text" id="newProjectName" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">A descriptive name for your project.</p>
+                    </div>
+                    <div>
+                        <label for="newProjectShortCode" class="block text-sm font-medium text-gray-700">Project Short Code:</label>
+                        <input type="text" id="newProjectShortCode" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                        <p id="newProjectShortCodeHelp" class="text-xs text-gray-500 mt-1">A short identifier (letters, numbers, dash, underscore). Used for filenames. E.g., "MyProject_2024".</p>
+                    </div>
+                    <div class="text-sm text-gray-600">
+                        <p>The project file (<code id="suggestedHdpcFilename" class="font-mono bg-gray-100 p-1 rounded">project.hdpc</code>) will be saved in the next step.</p>
+                    </div>
+                </div>
+
+                <div id="newProjectStep2" class="new-project-step hidden space-y-4">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">Project File Location:</p>
+                        <p id="chosenHdpcPathDisplay" class="font-mono bg-gray-100 p-2 rounded my-1 text-sm break-all"></p>
+                    </div>
+                    <div>
+                        <label for="newProjectModality" class="block text-sm font-medium text-gray-700">Modality Template:</label>
+                        <select id="newProjectModality" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white">
+                            </select>
+                    </div>
+                </div>
+
+                <div id="newProjectStep3" class="new-project-step hidden space-y-4">
+                    <p class="text-sm text-gray-700">Configure data paths for project: <strong id="configPathsForProjectName"></strong></p>
+                    <div>
+                        <label for="newProjectDataInPath" class="block text-sm font-medium text-gray-700">Input Data Directory:</label>
+                        <div class="flex mt-1">
+                            <input type="text" id="newProjectDataInPath" class="flex-grow p-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500" placeholder="Path to your source files">
+                            <button id="browseDataInPathBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 border border-l-0 border-gray-300 rounded-r-md text-sm">Browse...</button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Directory containing the source files for this project.</p>
+                    </div>
+                    <div>
+                        <label for="newProjectDataOutPath" class="block text-sm font-medium text-gray-700">Output Data Directory:</label>
+                        <div class="flex mt-1">
+                            <input type="text" id="newProjectDataOutPath" class="flex-grow p-2 border border-gray-300 rounded-l-md focus:ring-blue-500 focus:border-blue-500" placeholder="Path for processed files">
+                            <button id="browseDataOutPathBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-700 px-3 py-2 border border-l-0 border-gray-300 rounded-r-md text-sm">Browse...</button>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">Directory where processed files and outputs will be saved.</p>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">File Processing Mode (Batch Entity):</label>
+                        <select id="newProjectBatchEntity" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white">
+                            <option value="root">Root (each file for a separate Zenodo record)</option>
+                            <option value="subdirectory">Subdirectory (each subfolder becomes a separate Zenodo record)</option>
+                        </select>
+                    </div>
+                    <div id="dataInScanResult" class="text-sm text-gray-600 p-3 bg-blue-50 rounded-md hidden"></div>
+                </div>
+
+                <div id="newProjectStep4" class="new-project-step hidden space-y-4">
+                    <p id="newProjectSummaryText" class="text-lg text-green-700"></p>
+                    <p>You can now load this project from the dashboard or configure advanced settings like metadata mapping and processing pipelines later.</p>
+                </div>
+
+                <div id="newProjectStatus" class="text-sm text-red-600"></div>
+            </div>
+
+            <div class="flex justify-end items-center p-4 border-t bg-gray-50 rounded-b-lg space-x-3">
+                <button id="newProjectBackBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md hidden">Back</button>
+                <button id="newProjectNextBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md">Next</button>
+                <button id="newProjectFinishBtn" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md hidden">Finish & Open Project</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Metadata Mapping View -->
+    <div id="metadataMappingModal" class="hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="metadataMappingModalTitle" class="text-xl font-semibold text-gray-800">Configure Metadata Mapping</h3>
+                <button id="closeMetadataMappingModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+
+            <div id="metadataMappingModalBody" class="flex-grow p-6 overflow-y-auto space-y-6">
+                <div id="mappingStep0_Choice" class="mapping-step space-y-4">
+                    <p class="text-md font-medium text-gray-700">How do you want to provide metadata?</p>
+                    <div class="flex flex-col md:flex-row gap-4 mt-2">
+                        <button id="selectGenericMappingBtn" class="flex-1 p-4 border rounded-lg hover:bg-gray-50 text-left transition-all duration-150">
+                            <h4 class="font-semibold text-gray-800">Generic Mapping</h4>
+                            <p class="text-sm text-gray-600 mt-1">Define metadata using file properties (like filename) and fixed text values. Good for batches of files with similar metadata.</p>
+                        </button>
+                        <button id="selectFileMappingBtn" class="flex-1 p-4 border rounded-lg hover:bg-gray-50 text-left transition-all duration-150">
+                            <h4 class="font-semibold text-gray-800">From Metadata File</h4>
+                            <p class="text-sm text-gray-600 mt-1">Map metadata from columns in a CSV or Excel spreadsheet. Each row in the file corresponds to a source file.</p>
+                        </button>
+                    </div>
+                </div>
+                <div id="mappingStep1_FileSelection" class="mapping-step space-y-4">
+                    <div>
+                        <label for="metadataFileType" class="block text-sm font-medium text-gray-700">Metadata File Format:</label>
+                        <select id="metadataFileType" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm bg-white">
+                            <option value="csv">CSV (Comma Separated Values)</option>
+                            <option value="excel">Excel (XLSX, XLS)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="metadataFilePath" class="block text-sm font-medium text-gray-700">Metadata File Path:</label>
+                        <div class="flex mt-1">
+                            <input type="text" id="metadataFilePathDisplay" class="flex-grow p-2 border border-gray-300 rounded-l-md bg-gray-50" readonly placeholder="No file selected">
+                            <button id="browseMetadataFileBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 border border-blue-600 rounded-r-md text-sm">Browse...</button>
+                        </div>
+                    </div>
+                    <div id="metadataFilePreviewArea" class="hidden space-y-3">
+                        <div>
+                            <h4 class="text-md font-semibold text-gray-700">File Columns:</h4>
+                            <div id="metadataFileColumns" class="text-sm text-gray-600 p-2 bg-gray-50 rounded max-h-32 overflow-y-auto"></div>
+                        </div>
+                        <div>
+                            <h4 class="text-md font-semibold text-gray-700">Data Preview (First 5 Rows):</h4>
+                            <div id="metadataFileDataPreview" class="text-xs overflow-x-auto border rounded p-2 bg-gray-50 max-h-48"></div>
+                        </div>
+                        <div>
+                            <label for="metadataFilenameColumn" class="block text-sm font-medium text-gray-700">Select Column Containing Filenames:</label>
+                            <select id="metadataFilenameColumn" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm bg-white">
+                                </select>
+                            <p class="text-xs text-gray-500 mt-1">This column links metadata rows to your project's source files.</p>
+                        </div>
+                        <div id="metadataFileVerificationResult" class="text-sm mt-2"></div>
+                    </div>
+                </div>
+
+                <div id="mappingStep2_FieldMapping" class="mapping-step hidden space-y-4">
+                    <div id="dynamicMappingFormContainer" class="space-y-6">
+                        </div>
+                </div>
+
+
+                <div id="metadataMappingStatus" class="text-sm text-red-600"></div>
+            </div>
+
+            <div class="flex justify-between items-center p-4 border-t bg-gray-50 rounded-b-lg">
+                <button id="metadataMappingBackBtn" class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-md hidden">Back</button>
+                <div> <button id="metadataMappingNextBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-md">Next</button>
+                    <button id="metadataMappingSaveBtn" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-md hidden">Save Mapping</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="viewMappingModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="viewMappingModalTitle" class="text-xl font-semibold text-gray-800">Current Metadata Mapping</h3>
+                <button id="closeViewMappingModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="viewMappingModalBody" class="flex-grow p-6 overflow-y-auto space-y-3">
+                </div>
+            <div class="p-4 border-t bg-gray-50 text-right">
+                <button id="closeViewMappingModalFooterBtn" class="btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="uploadProgressModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-70 z-[100] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="uploadProgressTitle" class="text-lg font-semibold text-gray-800">Upload Progress</h3>
+                <button id="closeUploadProgressModalBtn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+            </div>
+            <div id="uploadProgressBody" class="p-6 space-y-3 overflow-y-auto">
+                <p id="uploadProgressStatus" class="text-sm text-gray-700">Initializing...</p>
+                <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
+                    <div id="uploadProgressBar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                </div>
+                <p id="uploadProgressPercentage" class="text-center text-sm font-medium text-gray-600">0%</p>
+                
+                <h4 class="text-sm font-semibold mt-3 text-gray-700">Logs:</h4>
+                <pre id="uploadProgressLog" class="bg-gray-100 p-3 rounded-md text-xs max-h-60 overflow-y-auto whitespace-pre-wrap"></pre>
+            </div>
+            <div class="p-4 border-t bg-gray-50 text-right">
+                <button id="cancelUploadBtn" class="btn-secondary text-sm py-2 px-3">Cancel (Not Implemented)</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pipeline Constructor Modal -->
+    
+    <!-- New Pipeline Modal -->
+    <div id="newPipelineModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Create New Pipeline</h2>
+                <button class="modal-close" id="closeNewPipeline">×</button>
+            </div>
+            <div class="modal-body">
+                <form id="newPipelineForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Pipeline Name</label>
+                        <input type="text" id="pipelineName" class="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Identifier</label>
+                        <input type="text" id="pipelineIdentifier" class="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                        <p class="text-sm text-gray-500 mt-1">Must be unique (e.g., image_enhancement_v1)</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Processing Mode</label>
+                        <div class="flex items-center space-x-4">
+                            <label class="flex items-center">
+                                <input type="radio" name="processingMode" value="root" checked class="mr-2">
+                                Root
+                            </label>
+                            <label class="flex items-center">
+                                <input type="radio" name="processingMode" value="subdirectory" class="mr-2">
+                                Subdirectory
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Modality Template</label>
+                        <select id="pipelineModality" class="w-full px-3 py-2 border border-gray-300 rounded-md" required>
+                            <option value="">Select modality...</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Notes</label>
+                        <textarea id="pipelineNotes" class="w-full px-3 py-2 border border-gray-300 rounded-md" rows="3"></textarea>
+                    </div>
+
+                    <div class="flex justify-end space-x-2 pt-4">
+                        <button type="button" id="cancelNewPipeline" class="btn-secondary">Cancel</button>
+                        <button type="submit" class="btn-primary">Create Pipeline</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Component Selector Modal -->
+    <div id="componentSelectorModal" class="modal hidden">
+        <div class="modal-overlay">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 class="modal-title">Select Pipeline Component</h2>
+                    <button class="modal-close" id="closeComponentSelector">×</button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-4">
+                        <input type="text" id="componentSearchInput" placeholder="Search components by name or category..." class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div id="componentSelectorList" class="space-y-2 max-h-96 overflow-y-auto">
+                        <!-- Components will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="editMetadataModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-60 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="editMetadataModalTitle" class="text-lg font-semibold text-gray-800">Edit Metadata</h3>
+                <button id="closeEditMetadataModalBtn" class="text-gray-500 hover:text-gray-700 text-2xl leading-none">&times;</button>
+            </div>
+            <div id="editMetadataModalBody" class="p-6 space-y-3 overflow-y-auto">
+                <div class="text-center text-gray-500">Loading metadata...</div>
+            </div>
+            <div class="p-4 border-t bg-gray-50 text-right space-x-2">
+                <button id="cancelEditMetadataBtn" class="btn-secondary text-sm py-2 px-3">Cancel</button>
+                <button id="saveAndPrepareMetadataBtn" class="btn-primary text-sm py-2 px-3">Save and Prepare</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="inputMappingModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2 class="modal-title" id="inputMappingModalTitle">Input Mapping</h2>
+                <button class="modal-close" id="closeInputMappingModal">×</button>
+            </div>
+            <div id="inputMappingModalBody" class="modal-body">
+                <div class="text-center p-8 text-gray-500">Loading...</div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelInputMappingBtn" class="btn-secondary">Cancel</button>
+                <button id="saveInputMappingBtn" class="btn-primary">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="outputMappingModal" class="js-modal-backdrop modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2 class="modal-title" id="outputMappingModalTitle">Pipeline Output Mapping</h2>
+                <button class="modal-close" id="closeOutputMappingModal">×</button>
+            </div>
+            <div id="outputMappingModalBody" class="modal-body">
+                <div class="text-center p-8 text-gray-500">Loading pipeline outputs...</div>
+            </div>
+            <div class="modal-footer">
+                <button id="closeOutputMappingBtn" class="btn-secondary">Close</button>
+                <button id="saveOutputMappingBtn" class="btn-primary">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="duplicatePipelineModal" class="js-modal-backdrop modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Duplicate Pipeline</h2>
+                <button class="modal-close" id="closeDuplicatePipelineModal">×</button>
+            </div>
+            <div class="modal-body">
+                <p class="text-sm text-gray-600 mb-2">Enter a new name for the duplicated pipeline.</p>
+                <div>
+                    <label for="newPipelineNameInput" class="block text-sm font-medium text-gray-700">New Pipeline Name</label>
+                    <input type="text" id="newPipelineNameInput" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelDuplicateBtn" class="btn-secondary">Cancel</button>
+                <button id="confirmDuplicateBtn" class="btn-primary">Duplicate</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="contentViewerModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50">
+        <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center pb-3 border-b">
+            <h3 id="contentViewerTitle" class="text-lg font-medium text-gray-900">Content Viewer</h3>
+            <button id="closeContentViewerModal" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+            </button>
+            </div>
+            <div id="contentViewerBody" class="mt-4 space-y-4 text-sm">
+            </div>
+        </div>
+    </div>
+
+    <div id="columnMappingModal" class="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50">
+        <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center pb-3 border-b">
+                <h3 id="columnMappingTitle" class="text-lg font-medium text-gray-900">Configure Column Mapping</h3>
+                <button id="closeMappingModal" type="button" class="text-gray-400 bg-transparent hover:text-gray-700 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                </button>
+            </div>
+            <div class="mt-4">
+                <p class="text-sm text-gray-600 mb-4">Map the placeholders found in your prompts to the columns from your selected table file.</p>
+                <div class="max-h-96 overflow-y-auto">
+                    <table class="w-full text-sm text-left">
+                        <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                            <tr>
+                                <th scope="col" class="px-4 py-2">Prompt Placeholder</th>
+                                <th scope="col" class="px-4 py-2">Table Column</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mappingTableBody">
+                            </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="flex items-center justify-end p-4 border-t rounded-b">
+                <button id="saveMappingBtn" type="button" class="btn-primary">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="saveTemplateModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center hidden z-50">
+        <div class="bg-white rounded-lg shadow-xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-medium text-gray-900 mb-4">Save Parameter Template</h3>
+            <div>
+                <label for="templateNameInput" class="block text-sm font-medium text-gray-700">Template Name</label>
+                <input type="text" id="templateNameInput" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm" placeholder="e.g., My Default Settings">
+            </div>
+            <div class="mt-5 sm:mt-6 sm:grid sm:grid-cols-2 sm:gap-3 sm:grid-flow-row-dense">
+                <button id="confirmSaveTemplateBtn" type="button" class="btn-primary w-full">Save</button>
+                <button id="cancelSaveTemplateBtn" type="button" class="btn-secondary w-full mt-3 sm:mt-0">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="schemaMappingModal" class="modal hidden">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2 id="schemaMappingTitle" class="modal-title">Configure Value Mapping</h2>
+                <button id="closeSchemaMappingModal" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="schemaMappingModalBody">
+                </div>
+            <div class="modal-footer">
+                <button id="saveSchemaMappingBtn" class="btn-primary">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pipeline Execution Modal -->
+    <div id="pipelineExecutionModal" class="modal hidden">
+        <div class="modal-overlay"></div>
+        <div class="modal-content max-w-4xl">
+            <div class="modal-header">
+                <h2 class="modal-title">Initiate Pipeline Execution</h2>
+                <button class="modal-close" id="closePipelineExecution">×</button>
+            </div>
+            <div class="modal-body space-y-6">
+                <div class="bg-blue-50 p-4 rounded-md">
+                    <h3 class="font-medium text-blue-900 mb-2">Selected Pipeline</h3>
+                    <p id="selectedPipelineInfo" class="text-blue-800 text-sm">No pipeline selected</p>
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Title Pattern Filter</label>
+                        <input type="text" id="titlePatternInput" placeholder="Enter pattern (e.g., *.mp4, dataset_*, etc.)" 
+                            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                        <p class="text-xs text-gray-500 mt-1">Use * as wildcard. Leave empty to include all records.</p>
+                    </div>
+                    
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Date Range Filter</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <input type="date" id="dateFromFilter" placeholder="YYYY-MM-DD"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <p class="text-xs text-gray-500 mt-1">From date</p>
+                            </div>
+                            <div>
+                                <input type="date" id="dateToFilter" placeholder="YYYY-MM-DD"
+                                    class="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                <p class="text-xs text-gray-500 mt-1">To date</p>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                
+                <div>
+                    <div class="flex justify-between items-center mb-3">
+                        <h3 class="font-medium text-gray-700">Affected Records</h3>
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="recordSearchInput" placeholder="Search records..." 
+                                class="px-3 py-1 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <span id="recordCountInfo" class="text-sm text-gray-600">0 records</span>
+                        </div>
+                    </div>
+                    
+                    <div id="affectedRecordsList" class="border border-gray-300 rounded-md max-h-64 overflow-y-auto bg-white">
+                        <div class="p-4 text-center text-gray-500">
+                            <p>No records match the current filters</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="bg-yellow-50 border border-yellow-200 p-4 rounded-md">
+                    <div class="flex items-start">
+                        <svg class="w-5 h-5 text-yellow-400 mr-2 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
+                        </svg>
+                        <div>
+                            <h4 class="text-sm font-medium text-yellow-800">Pipeline Execution Notice</h4>
+                            <p class="text-sm text-yellow-700 mt-1">This will initiate pipeline execution for the selected records. This feature is currently in development.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancelPipelineExecution" class="btn-secondary">Cancel</button>
+                <button id="confirmPipelineExecution" class="btn-primary" disabled>Execute Pipeline</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="dataMappingModal" class="modal hidden">
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h2 id="dataMappingTitle" class="modal-title">Configure Data Mapping</h2>
+                <button id="closeDataMappingModal" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-body" id="dataMappingModalBody">
+                </div>
+            <div class="modal-footer">
+                <button id="saveDataMappingBtn" class="btn-primary">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="pipelineMetadataMappingModal" class="modal hidden">
+        <div class="modal-overlay" id="pipelineMetadataMappingModalBackdrop"></div>
+        <div class="modal-content large">
+            <div class="modal-header">
+                <h3 id="pipelineMetadataModalTitle" class="modal-title">Configure Zenodo Metadata</h3>
+                <button id="closePipelineMetadataModal" class="modal-close">&times;</button>
+            </div>
+            <div id="pipelineMetadataModalBody" class="modal-body">
+                </div>
+            <div class="modal-footer">
+                <div id="pipelineMetadataStatus" class="text-sm text-red-500 mr-auto"></div>
+                <button id="cancelPipelineMetadataBtn" class="btn-secondary">Cancel</button>
+                <button id="savePipelineMetadataBtn" class="btn-primary">Save Mapping</button>
+            </div>
+        </div>
+    </div>
+
+
+    <div id="draftFilesModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center hidden js-modal-backdrop">
+        <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="draftFilesModalTitle" class="text-xl font-bold text-gray-800">Files for Draft</h3>
+                <button id="closeDraftFilesModalBtn" class="text-gray-500 hover:text-gray-800 text-2xl font-bold">&times;</button>
+            </div>
+            <div id="draftFilesModalBody" class="mt-4 max-h-[60vh] overflow-y-auto">
+                </div>
+            <div class="flex justify-end items-center pt-4 border-t mt-4">
+                <button id="closeDraftFilesModalFooterBtn" class="btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="descriptionConstructorModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-1/2 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-medium text-gray-900">Description Constructor</h3>
+                <button id="closeDescriptionConstructorModal" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                </button>
+            </div>
+            <div class="mt-4">
+                <p class="text-sm text-gray-600 mb-2">
+                    Create a template for the Zenodo description. Use "@" to insert available output file variables.
+                    You can access nested JSON values like so: <strong>${output_file_id.results.key}</strong>
+                </p>
+                <div class="relative">
+                    <textarea id="descriptionTemplateTextarea" class="w-full h-64 p-2 border rounded font-mono text-sm" placeholder="Enter your description template here..."></textarea>
+                    <div id="descriptionVariableSuggestions" class="absolute z-10 w-full bg-white border rounded shadow-lg hidden">
+                        </div>
+                </div>
+            </div>
+            <div class="mt-4 flex justify-end space-x-2">
+                <button id="saveDescriptionTemplateBtn" class="btn-primary">Save Template</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="zenodoKeyPromptModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-1/3 shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-medium text-gray-900">Enter Zenodo Metadata Key</h3>
+                <button id="closeZenodoKeyPromptModal" class="text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                </button>
+            </div>
+            <div class="mt-4">
+                <label for="zenodoKeyInput" class="block text-sm font-medium text-gray-700">Metadata Key Path</label>
+                <input type="text" id="zenodoKeyInput" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="e.g., title, doi, links.self, metadata.version">
+                <p class="text-xs text-gray-500 mt-1">Enter the key for the Zenodo metadata you want to insert.</p>
+            </div>
+            <div class="mt-4 flex justify-end space-x-2">
+                <button id="cancelZenodoKeyPromptBtn" class="btn-secondary">Cancel</button>
+                <button id="confirmZenodoKeyPromptBtn" class="btn-primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="fileManifestModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50">
+        <div class="relative mx-auto p-5 border w-full max-w-lg shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="fileManifestModalTitle" class="text-lg font-medium text-gray-900">Create New Version: File Manifest</h3>
+                <button id="closeFileManifestModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="mt-5 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Files from Previous Version</label>
+                    <p class="text-xs text-gray-500 mb-2">Uncheck any files you wish to remove from the new version.</p>
+                    <div id="previousVersionFilesList" class="max-h-40 overflow-y-auto border rounded-md p-2 bg-gray-50"></div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">New or Updated Source File</label>
+                    <p class="text-xs text-gray-500 mb-2">Select the primary source file for this new version. This will be uploaded.</p>
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="newSourceFilePath" class="file-path-input" placeholder="Select the new source file..." readonly>
+                        <button id="browseNewSourceFileBtn" class="btn-secondary text-sm">Browse...</button>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3 border-t pt-4">
+                <button id="cancelFileManifestBtn" class="btn-secondary">Cancel</button>
+                <button id="continueToPipelineBtn" class="btn-primary">Continue to Pipeline Selection</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="pipelineSelectionPromptModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50">
+        <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 class="text-lg font-medium text-gray-900">Select Pipeline</h3>
+                <button id="closePipelineSelectionPromptModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="mt-5">
+                <p class="text-sm text-gray-600 mb-4">Choose the pipeline to execute for the new version.</p>
+                <select id="pipelineSelectionPromptSelect" class="w-full p-2 border rounded-md bg-white"></select>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3 border-t pt-4">
+                <button id="cancelPipelineSelectionBtn" class="btn-secondary">Cancel</button>
+                <button id="confirmPipelineSelectionBtn" class="btn-primary">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- New Version Modal -->
+    <div id="newVersionModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50">
+        <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="newVersionModalTitle" class="text-lg font-medium text-gray-900">Create New Version</h3>
+                <button id="closeNewVersionModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="mt-5 space-y-6">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Pipeline to Run</label>
+                    <select id="newVersionModalPipelineSelect" class="w-full p-2 border rounded-md bg-white"></select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">File Handling for New Version</label>
+                    <div class="space-y-2 text-sm">
+                        <div class="flex items-center">
+                            <input type="radio" id="fileKeepAll" name="fileKeepMode" value="all" class="h-4 w-4" checked>
+                            <label for="fileKeepAll" class="ml-2">Keep all files from previous version</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="radio" id="fileKeepPatterns" name="fileKeepMode" value="pattern" class="h-4 w-4">
+                            <label for="fileKeepPatterns" class="ml-2">Keep files matching patterns</label>
+                        </div>
+                        <div class="flex items-center">
+                            <input type="radio" id="fileDeleteAll" name="fileKeepMode" value="none" class="h-4 w-4">
+                            <label for="fileDeleteAll" class="ml-2">Delete all files (replace with pipeline outputs)</label>
+                        </div>
+                    </div>
+                    <div id="filePatternsContainer" class="mt-3 hidden">
+                        <label for="fileKeepPattern" class="block text-xs font-medium text-gray-600 mb-1">Patterns (one per line)</label>
+                        <textarea id="fileKeepPattern" rows="3" class="w-full p-2 border rounded-md text-xs font-mono" placeholder="e.g., *.pdf, data_*.csv, /archive\/.*\.zip/ (regex)"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">Use standard wildcards (*, ?) or /regex/ for regular expressions.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3 border-t pt-4">
+                <button id="cancelNewVersionBtn" class="btn-secondary">Cancel</button>
+                <button id="confirmNewVersionBtn" class="btn-primary">Run Pipeline & Create Version</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="newVersionFromFileModal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex items-center justify-center hidden z-50">
+        <div class="relative mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center border-b pb-3">
+                <h3 id="newVersionFromFileModalTitle" class="text-lg font-medium text-gray-900">Create New Version from Files</h3>
+                <button id="closeNewVersionFromFileModal" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div id="newVersionFromFileStep1" class="mt-5 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Select Input Directory</label>
+                    <p class="text-xs text-gray-500 mb-2">Select the directory containing the new or updated source files.</p>
+                    <div class="flex items-center gap-2">
+                        <input type="text" id="newVersionDirectoryPath" class="file-path-input" placeholder="Select the source directory..." readonly>
+                        <button id="browseNewVersionDirectoryBtn" class="btn-secondary text-sm">Browse...</button>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Processing Mode</label>
+                    <div class="flex items-center space-x-4">
+                        <label class="flex items-center">
+                            <input type="radio" id="processingModeRoot" name="processingMode" value="root" class="mr-2" checked>
+                            Root (each file for a separate Zenodo record)
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" id="processingModeSubdirectory" name="processingMode" value="subdirectory" class="mr-2">
+                            Subdirectory (each subfolder becomes a separate Zenodo record)
+                        </label>
+                    </div>
+                </div>
+                <div id="rootOptionsContainer" class="mt-4 space-y-2">
+                    <label class="block text-sm font-medium text-gray-700">Matching Method (for Root mode)</label>
+                     <div class="flex items-center space-x-4">
+                        <label class="flex items-center">
+                            <input type="radio" id="matchByFilename" name="matchingMethod" value="filename" class="mr-2" checked>
+                            Filename only
+                        </label>
+                        <label class="flex items-center">
+                            <input type="radio" id="matchByHashcode" name="matchingMethod" value="hashcode" class="mr-2">
+                            Hashcode
+                        </label>
+                    </div>
+                </div>
+                 <div id="subdirectoryMessage" class="mt-4 text-sm text-amber-700 bg-amber-100 p-3 rounded-md hidden">
+                    This feature is not yet implemented.
+                </div>
+            </div>
+            <div id="newVersionFromFileStep2" class="mt-5 space-y-4 hidden">
+                 <p class="text-sm text-gray-600">The following records in your HDPC match the files in the selected directory. Select the records you want to create a new version for.</p>
+                 <div id="matchedRecordsContainer" class="max-h-64 overflow-y-auto border rounded-md">
+                    </div>
+            </div>
+            <div class="mt-6 flex justify-end space-x-3 border-t pt-4">
+                <button id="backToStep1Btn" class="btn-secondary hidden">Back</button>
+                <button id="scanFilesForMatchesBtn" class="btn-primary">Scan for Matches</button>
+                <button id="proceedToVersioningBtn" class="btn-primary hidden">Proceed to Versioning</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editDescriptionModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-xl font-semibold text-gray-800">Edit Project Description</h3>
+                <button id="closeEditDescriptionModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                <textarea id="projectDescriptionTextarea" class="w-full h-40 p-2 border rounded" placeholder="Enter project description..."></textarea>
+            </div>
+            <div class="flex justify-end items-center p-4 border-t bg-gray-50 rounded-b-lg space-x-3">
+                <button id="cancelEditDescriptionBtn" class="btn-secondary py-2 px-4">Cancel</button>
+                <button id="saveDescriptionBtn" class="btn-primary py-2 px-4">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="editTitleModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 class="text-xl font-semibold text-gray-800">Edit Project Title</h3>
+                <button id="closeEditTitleModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div class="p-6">
+                <input type="text" id="projectTitleInput" class="w-full p-2 border rounded" placeholder="Enter project title..."/>
+            </div>
+            <div class="flex justify-end items-center p-4 border-t bg-gray-50 rounded-b-lg space-x-3">
+                <button id="cancelEditTitleBtn" class="btn-secondary py-2 px-4">Cancel</button>
+                <button id="saveTitleBtn" class="btn-primary py-2 px-4">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="changelogDialog" class="modal hidden">
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">Disclaimer & Changelogs</h2>
+        </div>
+        <div class="modal-body">
+            <div class="modal-section">
+                <h3 class="modal-section-title">Disclaimer</h3>
+                <div id="disclaimer-content" class="modal-scrollable-content"></div>
+            </div>
+            <div class="modal-section">
+                <h3 class="modal-section-title">Changelog</h3>
+                <div id="changelog-content" class="modal-scrollable-content"></div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <label for="dontShowAgainCheckbox" class="flex items-center cursor-pointer">
+                <input type="checkbox" id="dontShowAgainCheckbox" class="mr-2">
+                Do not show this again
+            </label>
+            <button id="closeChangelogBtn" class="btn-secondary">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="js/renderer.js"></script>
+</body>
+</html>

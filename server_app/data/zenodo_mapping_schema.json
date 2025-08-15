@@ -1,0 +1,492 @@
+{
+    "standard_fields": [
+        {
+            "key": "upload_type",
+            "label": "Upload Type",
+            "type": "vocab",
+            "vocabKey": "upload_types",
+            "mandatory": true,
+            "default": "dataset",
+            "notes": "Primary type of the Zenodo record."
+        },
+        {
+            "key": "publication_type",
+            "label": "Publication Type",
+            "type": "vocab",
+            "vocabKey": "publication_types",
+            "mandatory_rule": "upload_type:publication",
+            "notes": "Specific type if 'Upload Type' is 'Publication'."
+        },
+        {
+            "key": "image_type",
+            "label": "Image Type",
+            "type": "vocab",
+            "vocabKey": "image_types",
+            "mandatory_rule": "upload_type:image",
+            "default": "photo",
+            "notes": "Specific type if 'Upload Type' is 'Image'."
+        },
+        {
+            "key": "title",
+            "label": "Title",
+            "type": "text",
+            "mandatory": true,
+            "allow_multiple_columns": true,
+            "notes": "Main title. Can combine multiple columns (ordered)."
+        },
+        {
+            "key": "publication_date",
+            "label": "Publication Date",
+            "type": "date",
+            "mandatory": true,
+            "default": "current_date",
+            "notes": "Format: YYYY-MM-DD."
+        },
+        {
+            "key": "description",
+            "label": "Description",
+            "type": "textarea",
+            "mandatory": true,
+            "allow_multiple_columns": true,
+            "allow_construct_later": true,
+            "notes": "Main description. Can be combined or auto-constructed."
+        },
+        {
+            "key": "access_right",
+            "label": "Access Rights",
+            "type": "vocab",
+            "vocabKey": "access_rights",
+            "mandatory": true,
+            "default": "open"
+        },
+        {
+            "key": "license",
+            "label": "License",
+            "type": "vocab",
+            "vocabKey": "common_licenses",
+            "mandatory_rule": "access_right:open,embargoed",
+            "default": "cc-by-4.0",
+            "notes": "Required if access is Open or Embargoed."
+        },
+        {
+            "key": "embargo_date",
+            "label": "Embargo End Date",
+            "type": "date",
+            "mandatory_rule": "access_right:embargoed",
+            "notes": "Format: YYYY-MM-DD. Required if access is Embargoed."
+        },
+        {
+            "key": "access_conditions",
+            "label": "Access Conditions",
+            "type": "text",
+            "mandatory_rule": "access_right:restricted",
+            "notes": "Required if access is Restricted."
+        },
+        {
+            "key": "keywords",
+            "label": "Keywords",
+            "type": "tags",
+            "mandatory": false,
+            "allow_multiple_columns": true,
+            "allow_hierarchical_delimiter": true,
+            "notes": "Comma-separated, or configure delimiters."
+        },
+        {"key": "notes", "label": "Additional Notes", "type": "textarea", "mandatory": false},
+        {"key": "version", "label": "Version", "type": "text", "mandatory": false, "default": "0.0.1"},
+        {
+            "key": "imprint_publisher",
+            "label": "Publisher (Imprint)",
+            "type": "text",
+            "mandatory": false,
+            "default": "Zenodo"
+        },
+        {
+            "key": "language",
+            "label": "Language",
+            "type": "text",
+            "mandatory": false,
+            "notes": "ISO 639-3 code (e.g., eng, deu)."
+        }
+    ],
+    "complex_fields": {
+        "creators": {
+            "label": "Creators",
+            "mandatory": true,
+            "allow_multiple": true,
+            "item_label": "Creator",
+            "notes": "At least one creator is required.",
+            "attributes": [
+                {
+                    "key": "name",
+                    "label": "Name (e.g., Last, First or Organization)",
+                    "type": "text",
+                    "mandatory": true
+                },
+                {"key": "affiliation", "label": "Affiliation", "type": "text", "mandatory": false},
+                {
+                    "key": "orcid",
+                    "label": "ORCID",
+                    "type": "text",
+                    "mandatory": false,
+                    "validation_regex": "^\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]$",
+                    "validation_message": "Invalid ORCID (e.g., 0000-0000-0000-000X)"
+                },
+                {
+                    "key": "gnd",
+                    "label": "GND ID",
+                    "type": "text",
+                    "mandatory": false,
+                    "validation_regex": "^\\d{8,10}[0-9X]?$",
+                    "validation_message": "Invalid GND (8-10 digits, optionally ending X)"
+                }
+            ]
+        },
+        "contributors": {
+            "label": "Contributors",
+            "mandatory": false,
+            "allow_multiple": true,
+            "item_label": "Contributor",
+            "attributes": [
+                {
+                    "key": "name",
+                    "label": "Name (e.g., Last, First or Organization)",
+                    "type": "text",
+                    "mandatory": true
+                },
+                {
+                    "key": "type",
+                    "label": "Type",
+                    "type": "vocab",
+                    "vocabKey": "contributor_types",
+                    "mandatory": true,
+                    "notes": "Role of the contributor."
+                },
+                {"key": "affiliation", "label": "Affiliation", "type": "text", "mandatory": false},
+                {
+                    "key": "orcid",
+                    "label": "ORCID",
+                    "type": "text",
+                    "mandatory": false,
+                    "validation_regex": "^\\d{4}-\\d{4}-\\d{4}-\\d{3}[\\dX]$",
+                    "validation_message": "Invalid ORCID (e.g., 0000-0000-0000-000X)"
+                }
+            ]
+        },
+        "dates": {
+            "label": "Dates",
+            "allow_multiple": true,
+            "item_label": "Date Entry",
+            "notes": "Dates relevant to the resource, like collection or update dates.",
+            "attributes": [
+                {
+                    "key": "start",
+                    "label": "Start Date",
+                    "type": "date",
+                    "mandatory": false,
+                    "notes": "Format: YYYY-MM-DD"
+                },
+                {
+                    "key": "end",
+                    "label": "End Date",
+                    "type": "date",
+                    "mandatory": false,
+                    "notes": "Format: YYYY-MM-DD. Leave empty if same as start date."
+                },
+                {
+                    "key": "type",
+                    "label": "Date Type",
+                    "type": "vocab",
+                    "vocabKey": "date_types",
+                    "mandatory": true,
+                    "notes": "The type of date interval (e.g., Collected, Valid)."
+                },
+                {
+                    "key": "description",
+                    "label": "Description",
+                    "type": "text",
+                    "notes": "Optional description for this date entry."
+                }
+            ]
+        },
+        "related_identifiers": {
+            "label": "Related Identifiers",
+            "allow_multiple": true,
+            "item_label": "Related ID",
+            "notes": "Identifiers of related resources, e.g., papers, datasets.",
+            "attributes": [
+                {
+                    "key": "identifier",
+                    "label": "Identifier",
+                    "type": "text",
+                    "mandatory": true,
+                    "notes": "e.g., DOI, URL, ISBN"
+                },
+                {
+                    "key": "relation_type",
+                    "label": "Relation Type",
+                    "type": "vocab",
+                    "vocabKey": "relation_types",
+                    "mandatory": true,
+                    "notes": "Relationship of this resource to the related identifier."
+                },
+                {
+                    "key": "resource_type",
+                    "label": "Related Resource Type",
+                    "type": "vocab",
+                    "vocabKey": "resource_types_general",
+                    "notes": "General type of the related resource (optional)."
+                },
+                {
+                    "key": "scheme",
+                    "label": "Identifier Scheme",
+                    "type": "text",
+                    "notes": "Scheme of the identifier (e.g., doi, url, isbn, arxiv). Optional."
+                }
+            ]
+        },
+        "subjects": {
+            "label": "Subjects/Keywords (Structured)",
+            "allow_multiple": true,
+            "item_label": "Subject",
+            "notes": "Structured subjects or keywords, potentially from a vocabulary.",
+            "attributes": [
+                {"key": "term", "label": "Term/Keyword", "type": "text", "mandatory": true},
+                {
+                    "key": "identifier",
+                    "label": "Identifier (URI)",
+                    "type": "text",
+                    "notes": "URI for the term, if available."
+                },
+                {
+                    "key": "scheme",
+                    "label": "Scheme",
+                    "type": "text",
+                    "notes": "Name of the vocabulary/scheme (e.g., LCSH, MeSH, GND for GND IDs)."
+                }
+            ]
+        },
+        "grants": {
+            "label": "Funding References (Grants)",
+            "allow_multiple": true,
+            "item_label": "Grant",
+            "attributes": [
+                {
+                    "key": "id",
+                    "label": "Grant ID or Funder Name/ID",
+                    "type": "text",
+                    "mandatory": true,
+                    "notes": "Grant number, award URL, or funder identifier (e.g. Crossref Funder ID)."
+                }
+            ]
+        },
+        "communities": {
+            "label": "Zenodo Communities",
+            "allow_multiple": true,
+            "item_label": "Community",
+            "notes": "Specify Zenodo community identifiers (slugs).",
+            "attributes": [
+                {
+                    "key": "identifier",
+                    "label": "Community Identifier (Slug)",
+                    "type": "text",
+                    "mandatory": true,
+                    "notes": "The short ID of the Zenodo community (e.g., 'zenodo', 'user-yourgroup')."
+                }
+            ]
+        },
+        "locations": {
+            "label": "Geographic Locations",
+            "allow_multiple": true,
+            "item_label": "Location",
+            "notes": "Geographic locations covered by the resource.",
+            "attributes": [
+                {
+                    "key": "place",
+                    "label": "Place Name",
+                    "type": "text",
+                    "mandatory": false,
+                    "notes": "Descriptive name of the location (e.g., Hanover, Germany)."
+                },
+                {
+                    "key": "description",
+                    "label": "Location Description",
+                    "type": "text",
+                    "notes": "Additional details for the location point or area."
+                },
+                {
+                    "key": "lat",
+                    "label": "Latitude (Point)",
+                    "type": "number",
+                    "notes": "WGS84 Latitude (e.g., 52.3759)"
+                },
+                {
+                    "key": "lon",
+                    "label": "Longitude (Point)",
+                    "type": "number",
+                    "notes": "WGS84 Longitude (e.g., 9.7320)"
+                }
+            ]
+        },
+        "journal": {
+            "label": "Journal Information",
+            "allow_multiple": false,
+            "item_label": "Journal",
+            "mandatory_rule": "publication_type:article",
+            "notes": "Details of the journal if this is an article.",
+            "attributes": [
+                {"key": "title", "label": "Journal Title", "type": "text", "mandatory": true},
+                {"key": "volume", "label": "Volume", "type": "text"},
+                {"key": "issue", "label": "Issue", "type": "text"},
+                {"key": "pages", "label": "Pages", "type": "text", "notes": "e.g., 1-10 or e12345"},
+                {
+                    "key": "year",
+                    "label": "Year of Publication in Journal",
+                    "type": "text",
+                    "notes": "YYYY (often same as main pub date but specific to journal context)"
+                }
+            ]
+        }
+    },
+    "vocabularies": {
+        "upload_types": {
+            "publication": "Publication",
+            "poster": "Poster",
+            "presentation": "Presentation",
+            "dataset": "Dataset",
+            "image": "Image",
+            "video": "Video",
+            "software": "Software",
+            "lesson": "Lesson",
+            "physicalobject": "Physical object",
+            "other": "Other"
+        },
+        "publication_types": {
+            "annotationcollection": "Annotation collection",
+            "book": "Book",
+            "section": "Book section",
+            "conferencepaper": "Conference paper",
+            "datamanagementplan": "Data management plan",
+            "article": "Journal article",
+            "patent": "Patent",
+            "preprint": "Preprint",
+            "deliverable": "Project deliverable",
+            "milestone": "Project milestone",
+            "proposal": "Proposal",
+            "report": "Report",
+            "softwaredocumentation": "Software documentation",
+            "taxonomictreatment": "Taxonomic treatment",
+            "technicalnote": "Technical note",
+            "thesis": "Thesis",
+            "workingpaper": "Working paper",
+            "other": "Other"
+        },
+        "image_types": {
+            "figure": "Figure",
+            "plot": "Plot",
+            "drawing": "Drawing",
+            "diagram": "Diagram",
+            "photo": "Photo",
+            "other": "Other"
+        },
+        "access_rights": {
+            "open": "Open Access",
+            "embargoed": "Embargoed Access",
+            "restricted": "Restricted Access",
+            "closed": "Closed Access"
+        },
+        "common_licenses": {
+            "cc-by-4.0": "Creative Commons Attribution 4.0 International",
+            "cc-by-sa-4.0": "Creative Commons Attribution-ShareAlike 4.0 International",
+            "cc-by-nd-4.0": "Creative Commons Attribution-NoDerivatives 4.0 International",
+            "cc-by-nc-4.0": "Creative Commons Attribution-NonCommercial 4.0 International",
+            "cc-by-nc-sa-4.0": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International",
+            "cc-by-nc-nd-4.0": "Creative Commons Attribution-NonCommercial-NoDerivatives 4.0 International",
+            "cc0-1.0": "Creative Commons Zero v1.0 Universal",
+            "ogl-uk-3.0": "Open Government Licence v3.0 (United Kingdom)",
+            "mit": "MIT License",
+            "gpl-3.0": "GNU General Public License v3.0 or later",
+            "apache-2.0": "Apache License 2.0"
+        },
+        "contributor_types": {
+            "ContactPerson": "Contact Person",
+            "DataCollector": "Data Collector",
+            "DataCurator": "Data Curator",
+            "DataManager": "Data Manager",
+            "Distributor": "Distributor",
+            "Editor": "Editor",
+            "HostingInstitution": "Hosting Institution",
+            "Producer": "Producer",
+            "ProjectLeader": "Project Leader",
+            "ProjectManager": "Project Manager",
+            "ProjectMember": "Project Member",
+            "RegistrationAgency": "Registration Agency",
+            "RegistrationAuthority": "Registration Authority",
+            "RelatedPerson": "Related Person",
+            "Researcher": "Researcher",
+            "ResearchGroup": "Research Group",
+            "RightsHolder": "Rights Holder",
+            "Supervisor": "Supervisor",
+            "Sponsor": "Sponsor",
+            "WorkPackageLeader": "Work Package Leader",
+            "Other": "Other"
+        },
+        "date_types": {
+            "Collected": "Collected",
+            "Valid": "Valid",
+            "Withdrawn": "Withdrawn"
+        },
+        "relation_types": {
+            "isCitedBy": "Is Cited By",
+            "cites": "Cites",
+            "isSupplementTo": "Is Supplement To",
+            "isSupplementedBy": "Is Supplemented By",
+            "isContinuedBy": "Is Continued By",
+            "continues": "Continues",
+            "isNewVersionOf": "Is New Version Of",
+            "isPreviousVersionOf": "Is Previous Version Of",
+            "isPartOf": "Is Part Of",
+            "hasPart": "Has Part",
+            "isReferencedBy": "Is Referenced By",
+            "references": "References",
+            "isDocumentedBy": "Is Documented By",
+            "documents": "Documents",
+            "isCompiledBy": "Is Compiled By",
+            "compiles": "Compiles",
+            "isVariantFormOf": "Is Variant Form Of",
+            "isOriginalFormOf": "Is Original Form Of",
+            "isIdenticalTo": "Is Identical To",
+            "isReviewedBy": "Is Reviewed By",
+            "reviews": "Reviews",
+            "isDerivedFrom": "Is Derived From",
+            "isSourceOf": "Is Source Of",
+            "describes": "Describes",
+            "isDescribedBy": "Is DescribedBy",
+            "hasMetadata": "Has Metadata",
+            "isMetadataFor": "Is Metadata For",
+            "isPublishedIn": "Is Published In",
+            "hasVersion": "Has Version",
+            "isVersionOf": "Is Version Of",
+            "requires": "Requires",
+            "isRequiredBy": "Is Required By",
+            "obsoletes": "Obsoletes",
+            "isObsoletedBy": "Is Obsoleted By"
+        },
+        "resource_types_general": {
+            "audiovisual": "Audiovisual",
+            "collection": "Collection",
+            "datapaper": "DataPaper",
+            "dataset": "Dataset",
+            "event": "Event",
+            "image": "Image",
+            "interactiveresource": "InteractiveResource",
+            "model": "Model",
+            "physicalobject": "PhysicalObject",
+            "service": "Service",
+            "software": "Software",
+            "sound": "Sound",
+            "text": "Text",
+            "workflow": "Workflow",
+            "other": "Other"
+        }
+    }
+}

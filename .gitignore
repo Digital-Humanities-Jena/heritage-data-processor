@@ -1,0 +1,92 @@
+# =======================================
+# Alpha & Application Specific
+# =======================================
+databases/component_registry.db
+databases/pipeline_system.db
+
+*.ztp
+*.hdpc
+
+pipeline_components/*
+!pipeline_components/.gitkeep
+
+build.sh
+
+# =======================================
+# Environment Specific
+# =======================================
+*.env
+**/.env
+
+**/env/
+**/.venv/
+**/venv/
+
+!example.env
+
+# =======================================
+# macOS Specific
+# =======================================
+._*
+__MACOSX
+.DS_Store
+.AppleDouble
+.LSOverride
+
+.DocumentRevisions-V100
+.fseventsd
+.Spotlight-V100
+.TemporaryItems
+.Trashes
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+
+# =======================================
+# Development & Dependency Artifacts
+# =======================================
+jsconfig.json
+
+node_modules/
+jspm_packages/
+
+packaged_python_backend/
+
+*.pyc
+*.pyo
+*.pyd
+
+__pycache__/
+.pytest_cache/
+
+build/
+dist/
+*.egg-info/
+*.egg
+
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+.idea/           # JetBrains IDEs (PyCharm, WebStorm, etc.)
+.vscode/         # Visual Studio Code
+*.sublime-project
+*.sublime-workspace
+.project         # Eclipse
+.classpath       # Eclipse
+.settings/       # Eclipse
+*.swp            # Vim swap file
+
+*.pid
+*.seed
+*.pid.lock
+
+.coverage
+coverage.xml
+htmlcov/
+.tox/

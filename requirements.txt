@@ -1,0 +1,42 @@
+# Generated requirements.txt format
+# Generated on: 2025-08-11 18:30:43
+# Source file: [privacy_censored]/helpers/write_requirements/list_of_imported_modules.txt
+
+# Note: Import name -> Package name mappings:
+# dotenv -> python-dotenv
+# flask -> Flask
+# yaml -> PyYAML
+
+# Third-party packages:
+Flask==3.1.0
+PyYAML==6.0.2
+flask-cors==6.0.0
+numpy==2.1.1
+pandas==2.2.3
+python-dotenv==1.0.1
+requests==2.32.3
+
+# Note: Standard library modules (no version needed):
+# argparse
+# collections
+# contextlib
+# datetime
+# difflib
+# functools
+# hashlib
+# json
+# logging
+# mimetypes
+# os
+# pathlib
+# queue
+# re
+# shutil
+# sqlite3
+# subprocess
+# sys
+# threading
+# time
+# traceback
+# typing
+# uuid

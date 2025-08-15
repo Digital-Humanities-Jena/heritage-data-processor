@@ -1,0 +1,268 @@
+settings:
+  groups:
+    osm_str:
+      - nominatim
+      - nominatim_2
+      - nominatim_f
+      - nominatim_b
+    congruence_str:
+      - validate_loc_str
+
+entity_name_assignment:
+  initial:
+    system: |
+      You are expert in identifying multilingual name variants of heritage buildings and landmarks. You are provided a list of Candidates for name variants and an Input. Compare the provided Input against the Candidates and identify the matching name variant. Return ONLY one matching name variant.
+
+      Example 1:
+      ### Candidates ### Sint-Martinuskerk | Sint-Eligiuskerk | Onze-Lieve-Vrouwekerk van Pamele | Onze-Lieve-Vrouw van Kerselarekapel | Onze-Lieve-Vrouw van Fatimakapel
+      ### Input ### Onze-Lieve-Vrouw van Pamele
+      Correct Response: Onze-Lieve-Vrouwekerk van Pamele
+
+      Example 2:
+      ### Candidates ### ### Candidates ### Sint-Andreaskerk | Pastorie Sint-Denijsparochie | Sint-Amanduskerk | Oude Kerk | Allerheiligenkerk
+      ### Input ### ### Input ### Parochiekerk Sint-Andreas
+      Correct Response: Sint-Andreaskerk
+
+      If no candidate is matching, respond with 'None'. Identify the name variant that is probably the same building or entity. Do not hallucinate. Do NOT just return the Input if it is not in the candidates. Your answer must contain ONLY the most similar candidate, no explanations or comments.
+    user: |
+      ### Candidates ### {candidates_str}
+      ### Input ### {entity_str}
+
+extract_geo_object_0:
+  initial:
+    system: |
+      You are an expert in the identification of location information in structured text data. Based on the provided Structured Text Data, your task is to identify the building name, city, province and country. You will provide a JSON object. Strictly follow these key definitions:
+      - "building": Building name (preferred), else object or landmark name. Leave "place" empty if not identifiable.
+      - "city": Name of city, village or town.
+      - "province": Name of province, county or region.
+      - "country": Name of country.
+
+      Following the key definitions, Return ONLY the JSON object in this format: {"building":"","city":"","province":"","country":""}, no explanations or alternatives.
+    user: |
+      ### Structured Text Data ###
+      Sublocation: {sublocation}
+      Location: {location}
+      Province: {province}
+      Country: {country}
+      Description: {description}
+      Additional Info: {headers}
+
+geo_small:
+  initial:
+    system_prompt: |
+      You are an expert in identification and extraction of building names from structured texts.
+    user_prompt: |
+      ### Structured Text ###
+      Sublocation: {sublocation}
+      Location: {location}
+      Province: {province}
+      Country: {country}
+      Description: {description}
+      Additional Info: {headers}
+
+      ### Instructions ###
+      Provide exactly one building name from the structured text. Return ONLY the building name, no explanations or alternatives.
+
+geo_large:
+  initial:
+    system_prompt: |
+      You are an expert in extracting the building name, city, province and country from structured texts as JSON objects.
+    user_prompt: |
+      ### Structured Text ###
+      Sublocation: {sublocation}
+      Location: {location}
+      Province: {province}
+      Country: {country}
+      Description: {description}
+      Additional Info: {headers}
+
+      ### Instructions ###
+      Extract the entities from the Structured Text and provide a JSON in this format: {json_format}. Use only the broader province name, if comma-separated values are given. Return ONLY the JSON object, no explanations or alternatives.
+
+
+
+nominatim:
+  initial:
+    system_prompt: |
+      You are a precise query generator for OSM. Generate only the exact query string requested, nothing more.
+    user_prompt: |
+      Create an OSM query string using ONLY this format:
+      "<building name>, <city>, <province>, <country>"
+
+      Use these details:
+      Building: {sublocation}
+      City: {location}
+      Province: {province}
+      Country: {country}
+
+      Return ONLY the query string, no explanations or alternatives.
+
+  no_results:
+    system_prompt: |
+      You are a precise query generator for OSM. Generate only the exact query string requested, nothing more.
+    user_prompt: |
+      Create an OSM query string using ONLY this format:
+      "<building name>, <city>, <country>"
+
+      Use these details:
+      Building: {sublocation}
+      City: {location}
+      Country: {country}
+
+      Return ONLY the query string, no explanations or alternatives.
+
+  final_attempt:
+    system_prompt: |
+      You are a precise query generator for OSM. Generate only the exact query string requested, nothing more.
+    user_prompt: |
+      Create an OSM query string using ONLY this format:
+      "<city>, <province>, <country>"
+
+      Use these details:
+      City: {location}
+      Province: {province}
+      Country: {country}
+
+      Return ONLY the query string, no explanations or alternatives.
+
+nominatim_2:
+  initial:
+    system_prompt: |
+      Provide the full address of the building in the specified format.
+    user_prompt: |
+      Building: {sublocation}
+      City: {location}
+      Province: {province}
+      Country: {country}
+      Format: "<building name>, <city>, <province>, <country>"
+
+  no_results:
+    system_prompt: |
+      Provide the address focusing on the building and city.
+    user_prompt: |
+      Previous query failed: {original_query}
+      Retry with:
+      Building: {sublocation}
+      City: {location}
+      Country: {country}
+      Format: "<building name>, <city>, <country>"
+
+  final_attempt:
+    system_prompt: |
+      Provide the address of the city in the specified format.
+    user_prompt: |
+      All queries failed: {previous_queries}
+      Broaden to location:
+      City: {location}
+      Province: {province}
+      Country: {country}
+      Format: "<city>, <province>, <country>"
+
+nominatim_f:
+  initial:
+    system_prompt: |
+      Provide the full address of the building in the specified format.
+    user_prompt: |
+      Building: {sublocation}
+      City: {location}
+      Province: {province}
+      Country: {country}
+      Description: {description}
+      Additional Info: {headers}
+      Format: "<building name>, <city>, <province>, <country>"
+
+  second:
+    system_prompt: |
+      Provide the address focusing on the building and city.
+    user_prompt: |
+      Previous query failed: {original_query}
+      Retry with:
+      City: {location}
+      Province: {province}
+      Country: {country}
+      Format: "<city>, <country>"
+
+  third:
+    system_prompt: |
+      Provide the address of the city in the specified format.
+    user_prompt: |
+      All queries failed: {previous_queries}
+      Broaden to location:
+      Province: {province}
+      Country: {country}
+      Format: "<province>, <country>"
+
+
+nominatim_b:
+  initial:
+    system_prompt: |
+      Provide the address of the building in the specified format. Use the information given in the Description and Additional Info. Return only the address string requested, nothing more. Think step by step.
+    user_prompt: |
+      Building: {sublocation}
+      City: {location}
+      Province: {province}
+      Country: {country}
+      Description: {description}
+      Additional Info: {headers}
+      Format: "<building name>, <city>, <province>, <country>"
+
+  second:
+    system_prompt: |
+      Provide the address in the specified format. Use the information given in the Description and Additional Info. Return only the address string requested, nothing more. Think step by step.
+    user_prompt: |
+      Building: {sublocation}
+      City: {location}
+      Country: {country}
+      Description: {description}
+      Additional Info: {headers}
+      Format: "<building name>, <city>, <country>"
+  
+  third:
+    system_prompt: |
+      Provide the address focusing on the city. Return only the address string requested, nothing more. Think step by step.
+    user_prompt: |
+      City: {location}
+      Province: {province}
+      Country: {country}
+      Format: "<city>, <country>"
+
+  fourth:
+    system_prompt: |
+      Provide the address in the specified format. Return only the string requested, nothing more. Think step by step.
+    user_prompt: |
+      Province: {province}
+      Country: {country}
+      Format: "<province>, <country>"
+
+
+nominatim_c:
+  initial:
+    system_prompt: |
+      You are a precise query generator for Nominatim. Extract the building and address information from the given data. Provide your answer in the specified format. Use the information given in the Description and Additional Info. Return only the Nominatim address string requested, nothing more. Think step by step.
+    user_prompt: |
+      Sublocation: {sublocation}
+      Location: {location}
+      Province: {province}
+      Country: {country}
+      Description: {description}
+      Additional Info: {headers}
+      Format: "<building name>, <city>, <province>, <country>"
+
+  second:
+    system_prompt: |
+      You are a precise query generator for OSM/Nominatim. Generate only the exact query string requested, nothing more.
+    user_prompt: |
+      Create an OSM query string using ONLY this format:
+      "<building name>, <city>, <province>, <country>"
+
+      Use these details:
+      Sublocation: {sublocation}
+      City: {location}
+      Province: {province}
+      Country: {country}
+      Description: {description}
+      Additional Info: {headers}
+
+      Return ONLY the query string, no explanations or alternatives.
+
+version: 0.0.1

@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+title: Heritage Data Processor
+message: >-
+  If you use or refer to this software, please cite it using the
+  metadata from this file.
+authors:
+  - given-names: Dominik
+    family-names: Ukolov
+    orcid: "https://orcid.org/0000-0002-7904-3892"
+url: 'https://github.com/Digital-Humanities-Jena/heritage-data-processor'
+license: GPL-3.0-or-later
+date-released: 2025-08-15

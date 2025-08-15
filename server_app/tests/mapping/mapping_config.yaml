@@ -1,0 +1,54 @@
+# ------------------------------------------------------------------------------
+# Heritage Data Processor - Metadata Mapping Configuration
+# ------------------------------------------------------------------------------
+# This file defines how to map columns from a spreadsheet to Zenodo metadata fields.
+# It will be used by the 'configure-mapping' CLI command.
+
+# The name of the column in your spreadsheet that contains the source filenames.
+# This is the crucial link between your metadata file and the project's image files.
+filename_column: "file name"
+
+# Defines the mappings for all other Zenodo fields.
+# Each key is a Zenodo field (e.g., 'title', 'description', 'creators').
+field_mappings:
+  # --- Basic Fields ---
+  title:
+    type: "column"
+    value: "file name"
+  description:
+    type: "column"
+    value: "description"
+  keywords:
+    type: "column"
+    value: "keywords"
+    # Optional: If your keywords are in one cell, specify the delimiter.
+    delimiter: ";"
+  
+  # --- Fields with Defaults ---
+  upload_type:
+    type: "literal"
+    value: "image" # All records will be of the type 'image'.
+  image_type:
+    type: "literal"
+    value: "photo"
+  publication_date:
+    type: "literal"
+    value: "2025-08-07" # All records will use this date.
+  access_right:
+    type: "literal"
+    value: "open"
+  license:
+    type: "literal"
+    value: "cc-by-4.0"
+
+  # --- Complex Fields (like Creators) ---
+  creators:
+    type: "complex"
+    entries:
+      # Each entry in this list will create one creator for EACH record.
+      - name:
+          type: "column"
+          value: "province"
+        affiliation:
+          type: "column"
+          value: "country"

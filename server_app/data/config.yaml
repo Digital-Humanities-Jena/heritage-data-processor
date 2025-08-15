@@ -1,0 +1,188 @@
+developer:
+  alpha_features_enabled: false
+core:
+  batch_entity: root
+  copy_record_data: false
+  modality: Image / Photography
+  mode: batch
+  use_env_file: true
+  use_sandbox: true
+  show_startup_dialog: true
+description:
+  mapping:
+    line_0: '<u>File Name</u>: {filename} <br>'
+    line_1: '<u>Sublocation</u>: {sublocation} <br>'
+    line_2: '<u>Location</u>: {location} <br>'
+    line_3: '<u>Province</u>: {province} <br>'
+    line_4: '<u>Country</u>: {country} <br>'
+    line_5: '<u>Header</u>: {header} <br>'
+    line_6: '<u>Description</u>: {description} <br>'
+    line_7: '<u>Keywords</u>: {keywords} <br><br>'
+    line_8: '<u>Author</u>: {author} <br>'
+    line_9: '<u>Copyright</u>: {copyright} <br>'
+geolocation:
+  enhanced_similarity: false
+  identify_by_llm: true
+  initial_bbox_query: false
+  nominatim_truncate_words: 3
+  similarity_threshold: 0.7
+  verbose_llm_calls: true
+geonames:
+  username: modavis
+image_operations:
+  image_resize:
+    active: true
+    max_dimension_value: 256
+    max_dimensions: false
+    ratio: 1
+    use_ratio: false
+  person_masker:
+    active: false
+    bbox_device: cpu
+    bbox_model: ./Models/yolov10x.pt
+    blur_blackwhite: false
+    delete_bbox_after_upload: true
+    delete_segmented_after_upload: false
+    max_files: -1
+    paths:
+      bbox_images: Tutorials/Output/*projectTitle/Images/TMP/bboxes
+      input_images: Tutorials/Input/*projectTitle/Images
+      masked_images: Tutorials/Output/*projectTitle/Images/persons_masked
+      processing_log: Tutorials/Output/*projectTitle/Logs/persons_masked
+      segmented_images: Tutorials/Output/*projectTitle/Images/TMP/segmented
+    segmentation_device: cpu
+    segmentation_model: ./Models/sam2_t.pt
+    threshold: 0.1
+    write_bbox_images: true
+    write_segmented_images: true
+  process_extensions:
+    - .png
+    - .jpg
+    - .jpeg
+    - .bmp
+    - .gif
+    - .tif
+    - .tiff
+  settings:
+    add_exif_to_description: true
+    add_image_metadata_to_description: true
+    upload_exif_json_separately: true
+    upload_metadata_json: false
+    upload_resized_image: true
+    upload_resized_image_only: true
+llm_prompts:
+  entity_matching_id: entity_name_assignment
+  entity_matching_key: initial
+  geo_extraction_id: extract_geo_object_0
+  geo_extraction_key: initial
+meta:
+  short: cli-test
+  title: CLI Test
+modality_file_filters:
+  3D Model:
+    accepted_extensions:
+      - .glb
+      - .gltf
+      - .obj
+      - .stl
+      - .fbx
+      - .ply
+    default_filter_name: 3D Models
+    description: Defines accepted extensions for 3D model files.
+    extensions_label: Accepted 3D Model Extensions
+  Audio:
+    accepted_extensions:
+      - .mp3
+      - .wav
+      - .ogg
+      - .flac
+      - .aac
+      - .m4a
+    default_filter_name: Audio Files
+    description: Defines accepted extensions for audio files.
+    extensions_label: Accepted Audio Extensions
+  Image / Photography:
+    accepted_extensions:
+      - .jpg
+      - .jpeg
+      - .png
+      - .tif
+      - .tiff
+      - .bmp
+      - .gif
+      - .webp
+      - .heic
+      - .heif
+    default_filter_name: Images
+    description: Defines accepted extensions for image files.
+    extensions_label: Accepted Image Extensions
+  Text / Document:
+    accepted_extensions:
+      - .pdf
+      - .doc
+      - .docx
+      - .txt
+      - .md
+      - .rtf
+      - .odt
+    default_filter_name: Documents
+    description: Defines accepted extensions for text and document files.
+    extensions_label: Accepted Document Extensions
+  Video:
+    accepted_extensions:
+      - .mp4
+      - .mov
+      - .avi
+      - .mkv
+      - .webm
+    default_filter_name: Video Files
+    description: Defines accepted extensions for video files.
+    extensions_label: Accepted Video Extensions
+model_operations:
+  thumbnail_settings:
+    add_thumbnails_table: true
+    perspective_tags:
+      - perspective_1
+      - perspective_2
+      - perspective_3
+      - perspective_4
+      - perspective_top
+    resolutions:
+      - 1000x1000
+      - 512x512
+      - 256x256
+      - 128x128
+nominatim:
+  user_agent: 3DBigDS/1.0
+ollama:
+  model_major: qwen2.5:14b
+  model_major_time: 390
+  model_medium: qwen3:8b
+  model_medium_timeout: 75
+  model_minor: gemma3:4b
+  model_minor_timeout: 25
+  port: 11434
+paths:
+  config: ./config.yaml
+  data_in: /Users/dominik/Desktop/GitProjects/zentx-desktop/zenodo_toolbox_cli/Images
+  data_out: ./Input/cli-test/Out
+  data_rec_copy: ''
+  db_config: ./db_config.yaml
+  db_sqlite: ./cli.db
+  env_file: >-
+    /Users/dominik/Desktop/GitProjects/zentx-desktop/zenodo_toolbox_cli/zenodo.env
+  geocache_file: ./geo_cache_cli.json
+  models: ./Models
+  pipeline_components_file: ./pipeline_components.yaml
+  prompts_file: >-
+    /Users/dominik/Desktop/GitProjects/zentx-desktop/zenodo_toolbox_cli/prompts.yaml
+rates:
+  per_hour: 4750
+  per_minute: 90
+urls:
+  base_url: https://zenodo.org
+  geonames_url: http://api.geonames.org/searchJSON
+  nominatim_reverse_url: https://nominatim.openstreetmap.org/reverse
+  nominatim_url: https://nominatim.openstreetmap.org/search
+  overpass_url: http://overpass-api.de/api/interpreter
+  sandbox_url: https://sandbox.zenodo.org

@@ -1,0 +1,581 @@
+Zenodo Operations:
+- name: prepare_and_validate_source_metadata
+  label: "\u2699\uFE0F Prepare & Validate Source Metadata"
+  description: Extracts metadata for a source file based on the project's configured
+    spreadsheet mapping, validates it for Zenodo, and updates the file's status and
+    associated Zenodo record draft in the HDPC database.
+  module: pipeline_manager
+  function: component_wrapper_prepare_metadata
+  idempotent: true
+  on_error: fail_pipeline_for_file
+  inputs:
+  - name: source_file_to_prepare
+    description: The original source file whose metadata needs preparation.
+    data_type_tag: source_file_db_id
+    required: true
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_metadata_preparation_log.json'
+    type: application/json
+    category: supplemental
+    description: Log of metadata preparation, including any validation errors or success.
+    data_type_tag: metadata_preparation_log_path
+  params: []
+- name: create_zenodo_record_and_upload_all_files
+  label: "\u2601\uFE0F Create Zenodo Draft & Upload All Files"
+  description: Creates a new Zenodo draft record based on prepared metadata for the
+    source file, then uploads the source file and all its currently associated derived/generated
+    files from the HDPC database.
+  module: pipeline_manager
+  function: component_wrapper_create_record_and_upload
+  idempotent: false
+  on_error: fail_pipeline_for_file
+  inputs:
+  - name: source_file_context
+    description: Context of the primary source file being processed (its DB ID).
+    data_type_tag: source_file_db_id
+    required: true
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_zenodo_draft_creation_log.json'
+    type: application/json
+    category: supplemental
+    description: Log and API response from Zenodo after creating the draft record
+      and uploading files.
+    data_type_tag: zenodo_draft_api_data_path
+  params:
+  - name: file_purposes_to_upload
+    label: File Purposes/Categories to Upload
+    type: list_str
+    default:
+    - main
+    - derived
+    - generated
+    - enhanced
+    - supplemental
+    help_text: Specify which categories of associated files (from HDPC's record_files_map.file_purpose)
+      should be uploaded.
+- name: publish_zenodo_record
+  label: "\U0001F680 Publish Zenodo Record"
+  description: Publishes an existing Zenodo draft record.
+  module: pipeline_manager
+  function: component_wrapper_publish_record
+  idempotent: false
+  on_error: fail_pipeline_for_file
+  inputs:
+  - name: zenodo_draft_context
+    description: The Zenodo draft record data (typically output from the create step)
+      or source file context to find the draft.
+    data_type_tag: zenodo_draft_api_data_path
+    required: false
+  - name: source_file_context_fallback
+    description: Context of the primary source file (its DB ID) to find the associated
+      draft.
+    data_type_tag: source_file_db_id
+    required: false
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_zenodo_published_log.json'
+    type: application/json
+    category: supplemental
+    description: Log and API response from Zenodo after attempting to publish the
+      record.
+    data_type_tag: zenodo_published_api_data_path
+  params: []
+General:
+- name: validate_file_integrity
+  label: "\U0001F50E Validate File Integrity"
+  description: Performs basic validation checks on the file (e.g., readability, format-specific
+    checks like image verification).
+  module: file_validator
+  function: validate_file
+  idempotent: true
+  on_error: skip_step_and_warn
+  inputs:
+  - name: file_to_validate
+    data_type_tag: any_file_path
+    required: true
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_validation_report.json'
+    type: application/json
+    category: supplemental
+    description: Report of validation errors, if any.
+    data_type_tag: validation_report_json_path
+  params: []
+- name: download_web_resource
+  label: "\U0001F310 Download Web Resource"
+  description: Downloads a file (e.g., image, document) from a given URL.
+  module: utilities
+  function: download_image
+  inputs: []
+  outputs:
+  - name_pattern: '{url_filename}'
+    type: application/octet-stream
+    category: acquired
+    description: File downloaded from the specified URL.
+    data_type_tag: downloaded_file_path
+  params:
+  - name: resource_url
+    label: Resource URL
+    type: str
+    constraints:
+      regex: ^https?://.+
+    help_text: The URL of the file to download.
+  - name: target_dir
+    label: Target Directory (Pipeline Managed)
+    type: str
+    default: ./Downloads/Pipeline
+    help_text: Directory where the downloaded file will be saved (usually managed
+      by pipeline).
+- name: acquire_wikimedia_images_by_author
+  label: "\U0001F5BC\uFE0F Acquire Wikimedia Images by Author"
+  description: Fetches image metadata (including coordinates) from Wikimedia Commons
+    for a given author.
+  module: wikimedia_tools
+  function: main
+  inputs: []
+  outputs:
+  - name_pattern: '{author}_wikimedia_image_coordinates.csv'
+    type: text/csv
+    category: acquired
+    description: CSV file containing list of images and their coordinates by the author.
+    data_type_tag: wikimedia_coords_csv_path
+  params:
+  - name: author
+    label: Wikimedia Commons Author Username
+    type: str
+    help_text: The 'User:Username' part for the category, e.g., 'Photographer123'.
+  - name: api_limit_per_query
+    label: API Query Limit
+    type: int
+    default: 500
+    constraints:
+      min: 1
+      max: 500
+    help_text: Number of results per API call to Wikimedia (max 500).
+- name: download_youtube_audio
+  label: "\U0001F3A4 Download YouTube Audio"
+  description: Downloads audio from a YouTube video URL as an MP3 file.
+  module: acquisition_tools
+  function: download_yt_audio
+  inputs: []
+  outputs:
+  - name_pattern: '{youtube_title}.mp3'
+    type: audio/mpeg
+    category: acquired
+    description: MP3 audio file extracted from the YouTube video.
+    data_type_tag: youtube_audio_mp3_path
+  params:
+  - name: youtube_url
+    label: YouTube Video URL
+    type: str
+    constraints:
+      regex: ^(https?://)?(www\.)?(youtube\.com|youtu\.?be)/.+
+    help_text: The full URL of the YouTube video.
+- name: search_youtube_videos
+  label: "\U0001F50D Search YouTube Videos"
+  description: Searches YouTube for videos based on terms and returns metadata.
+  module: acquisition_tools
+  function: search_youtube_videos
+  inputs: []
+  outputs:
+  - name_pattern: Youtube_{search_terms_slug}.json
+    type: application/json
+    category: supplemental
+    description: JSON file containing metadata of YouTube videos matching search terms.
+    data_type_tag: Youtube_results_json_path
+  params:
+  - name: search_terms
+    label: Search Terms
+    type: str
+    help_text: Keywords to search for on YouTube.
+  - name: max_results
+    label: Max Results
+    type: int
+    default: 10
+    constraints:
+      min: 1
+      max: 50
+- name: calculate_file_checksum
+  label: "\U0001F511 Calculate File Checksum"
+  description: Calculates the SHA256 checksum for a file and can store it (e.g., in
+    metadata or a report).
+  module: utilities
+  function: get_file_hash
+  inputs:
+  - name: source_file
+    description: The file to checksum.
+    data_type_tag: any_file_path
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}.sha256'
+    type: text/plain
+    category: derived
+    description: Text file containing the SHA256 hash of the input file.
+    data_type_tag: checksum_file_path
+  params: []
+- name: validate_xml_file
+  label: "\U0001F4C4 Validate XML File"
+  description: Validates an XML file against specified XSD schema(s).
+  module: utilities
+  function: validate_xml_against_schema_wrapper
+  inputs:
+  - name: xml_file
+    description: The XML file to validate.
+    data_type_tag: xml_file_path
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_validation_report.json'
+    type: application/json
+    category: supplemental
+    description: JSON report of XML validation results.
+    data_type_tag: xml_validation_report_json_path
+  params:
+  - choices:
+    - label: EDM (Europeana Data Model)
+      value: edm
+    - label: METS/MODS
+      value: metsmods
+    - label: Custom XSD
+      value: custom
+    default: metsmods
+    help_text: Select the type of schema to validate against.
+    label: Schema Type
+    name: schema_type
+    type: choice
+  - condition_param_not_empty: true
+    default: ./Templates/EDM_Schemas/edm.xsd
+    help_text: Path to the primary XSD schema file (e.g., edm.xsd, mets.xsd).
+    label: Main XSD Schema File Path
+    name: main_xsd_path
+    type: str
+  - condition_param_equals:
+      name: schema_type
+      value: metsmods
+    default: ./Templates/MetsMods_Schemas/mets.xsd
+    help_text: Path to a secondary XSD (e.g., mods.xsd if validating METS/MODS).
+    label: Secondary XSD Schema File Path (e.g., MODS)
+    name: secondary_xsd_path
+    required: false
+    type: str
+- name: metadata_from_filename_patterns
+  label: "\U0001F9E9 Extract Metadata from Filename Patterns"
+  description: Extracts structured metadata from filenames based on regex patterns
+    or known timestamp formats.
+  module: utilities
+  function: extract_metadata_from_filename_wrapper
+  inputs:
+  - name: source_file
+    description: The file whose name is to be parsed.
+    data_type_tag: any_file_path
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_filename_metadata.json'
+    type: application/json
+    category: derived
+    description: JSON file containing metadata extracted from the filename.
+    data_type_tag: filename_metadata_json_path
+  params:
+  - name: extraction_mode
+    label: Extraction Mode
+    type: choice
+    choices:
+    - value: timestamp
+      label: Timestamp (YYYY-Mon-DD_HHhMMmSSs)
+    - value: custom_regex
+      label: Custom Regex Patterns
+    default: timestamp
+  - name: custom_patterns_json
+    label: Custom Regex Patterns (JSON string)
+    type: str
+    required: false
+    condition_param_equals:
+      name: extraction_mode
+      value: custom_regex
+    help_text: 'JSON string defining custom patterns, e.g., {"id": "\\\\d+", "type":
+      "[A-Z]"}.'
+  - name: segment_separator
+    label: Segment Separator for Regex Mode
+    type: str
+    default: _
+    condition_param_equals:
+      name: extraction_mode
+      value: custom_regex
+    help_text: Character used to split filename into segments for pattern matching.
+Image / Photography:
+- name: extract_image_metadata
+  label: "\U0001F4C4 Extract Image Metadata"
+  module: component_wrappers
+  function: component_wrapper_extract_image_metadata
+  description: Extracts EXIF and other basic metadata from an image file and saves
+    it as a JSON file.
+  category: Image / Photography
+  inputs:
+  - name: image_file_to_process
+    data_type_tag: source_image_path
+    description: Path to the image file from which to extract metadata.
+    is_primary_for_naming: true
+    required: true
+  outputs:
+  - name_pattern: '{original_stem}_exif.json'
+    data_type_tag: image_exif_json_path
+    category: metadata
+    file_purpose: derived
+    type: json
+    description: JSON file containing extracted EXIF and other metadata.
+  params:
+  - name: remove_address_from_exif
+    label: Remove Address from EXIF
+    type: bool
+    default: true
+    help_text: If true, removes address-like information from EXIF metadata.
+  - name: remove_mail_from_exif
+    label: Remove Email from EXIF
+    type: bool
+    default: true
+    help_text: If true, removes email addresses from EXIF metadata.
+  idempotent: true
+  on_error: continue_with_warning
+- name: mask_persons_on_image
+  label: "\U0001F464 Person Masking"
+  description: Detects and masks persons in images for privacy.
+  module: person_masker
+  function: mask_persons
+  inputs:
+  - name: source_image
+    description: The image file to mask.
+    data_type_tag: source_image_path
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_masked.jpg'
+    type: image/jpeg
+    category: modified
+    description: Image with detected persons masked.
+    data_type_tag: masked_image_path
+  - name_pattern: '{original_stem}_processing_log.json'
+    type: application/json
+    category: log
+    description: Log of detection and masking process for this image.
+    data_type_tag: masking_log_json_path
+  params:
+  - constraints:
+      max: 0.9
+      min: 0.1
+    default: '0.1'
+    help_text: Sensitivity for person detection (0.1-0.9). Higher is stricter.
+    label: Detection Threshold
+    name: threshold
+    type: float
+  - default: 'true'
+    help_text: Whether to apply masking to grayscale/monochrome images.
+    label: Blur Black & White Images
+    name: blur_blackwhite
+    type: bool
+  - default: 'false'
+    help_text: Save a copy of the image with detected bounding boxes drawn.
+    label: Save Images with Bounding Boxes
+    name: write_bbox_images
+    type: bool
+  - default: 'false'
+    help_text: Save intermediate images showing segmentation masks.
+    label: Save Segmented Images
+    name: write_segmented_images
+    type: bool
+- name: add_resized_image
+  label: "\U0001F5BC\uFE0F Resize Images (Thumbnails)"
+  description: Creates resized versions of images.
+  module: model_tools
+  function: resize_image
+  inputs:
+  - name: image_to_resize
+    description: The image file to resize (can be original or an enhanced version
+      like masked).
+    data_type_tag: source_image_path
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_{size}px.{original_ext}'
+    type: image/{original_ext}
+    category: derived
+    description: Resized image (thumbnail).
+    data_type_tag: resized_image_path
+  params:
+  - name: sizes
+    label: Output Sizes (px, comma-separated)
+    type: list_int
+    default:
+    - 512
+    - 256
+    - 128
+- name: rename_image_by_pixel_suffix
+  label: "\U0001F5BC\uFE0F Rename Image by Max Pixel Suffix"
+  description: Renames image files by adding their max pixel size as a suffix (e.g.,
+    'img_1000px.png'). Replaces the original filename.
+  module: utilities
+  function: rename_by_max_pixel
+  inputs:
+  - name: source_image
+    description: The original image file to rename.
+    data_type_tag: source_image_path
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_1000px.{original_ext}'
+    type: image/{original_ext}
+    category: enhanced
+    description: Image renamed with its maximum pixel dimension in the suffix.
+    data_type_tag: renamed_image_path
+  params: []
+- name: check_image_size_consistency
+  label: "\U0001F5BC\uFE0F Validate Image Size Consistency"
+  description: Checks image sizes in a directory against a reference maximum pixel
+    size, identifying convergent/divergent images. (Best for batch/directory processing)
+  module: utilities
+  function: check_image_size_consistency
+  inputs:
+  - name: image_directory
+    description: Path to the directory containing images.
+    data_type_tag: image_directory_path
+  outputs:
+  - name_pattern: '{original_stem}_size_consistency_report.json'
+    type: application/json
+    category: supplemental
+    description: JSON report listing convergent and divergent images based on size.
+    data_type_tag: size_consistency_report_json_path
+  params:
+  - name: reference_max_px
+    label: Reference Max Pixel Size
+    type: int
+    default: 1000
+    help_text: The target maximum pixel dimension to check against.
+3D Model:
+- name: generate_renders
+  label: "\U0001F5BC\uFE0F Generate Renders/Thumbnails (Complex)"
+  description: Renders thumbnails of a 3D model from multiple perspectives with advanced
+    lighting, and optionally resizes them.
+  module: model_tools
+  function: render_model_thumbnails_complex
+  idempotent: true
+  on_error: fail_pipeline_for_file
+  inputs:
+  - name: source_model
+    description: The 3D model file (e.g., GLB, GLTF).
+    data_type_tag: source_model_path
+    required: true
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_{perspective_name}.png'
+    type: image/png
+    category: generated
+    description: Primary rendered image from a specific perspective.
+    data_type_tag: perspective_render_path
+    multiplicity_source:
+    - num_perspectives
+    - include_top_perspective
+  - name_pattern: '{original_stem}_{perspective_name}_{size}px.png'
+    type: image/png
+    category: generated
+    description: Resized version of a perspective render.
+    data_type_tag: resized_perspective_render_path
+    condition_param: resize_dimensions
+    multiplicity_source:
+    - num_perspectives
+    - include_top_perspective
+    - resize_dimensions
+  params:
+  - name: num_perspectives
+    label: Number of Side Perspectives
+    type: int
+    default: 4
+    constraints:
+      min: 1
+      max: 12
+    help_text: Number of views rendered around the model (e.g., 4 for front, right,
+      back, left).
+  - name: include_top_perspective
+    label: Include Top-Down View
+    type: bool
+    default: true
+    help_text: Whether to render an additional view from the top.
+  - name: resolution
+    label: Primary Render Resolution (px)
+    type: int
+    default: 1000
+    help_text: Resolution for the initial perspective renders (e.g., 1000 for 1000x1000).
+  - name: samples
+    label: Render Samples (Cycles)
+    type: int
+    default: 128
+    help_text: Number of samples for Cycles rendering, affecting quality and time.
+  - name: use_gpu
+    label: Use GPU for Rendering
+    type: bool
+    default: false
+    help_text: If a compatible GPU and CUDA/OptiX are available in Blender environment.
+  - name: light_energy
+    label: Main Light Energy
+    type: float
+    default: 5.0
+    help_text: Intensity of the primary light source in the render scene.
+  - name: camera_distance_factor
+    label: Camera Distance Factor
+    type: float
+    default: 1.5
+    help_text: Multiplier for camera distance based on object size. Adjusts framing.
+  - name: resize_dimensions
+    label: Resize Renders To (px, comma-separated)
+    type: list_int
+    default:
+    - 512
+    - 256
+    - 128
+    help_text: List of max dimensions to resize the primary renders to. Leave empty
+      for no resizing.
+- name: convert_glb_draco_to_uncompressed
+  label: "\U0001F4E6 Convert Draco GLB to Uncompressed GLB"
+  description: Converts a Draco-compressed GLB file to an uncompressed GLB using gltf-transform.
+  module: model_tools
+  function: convert_compressed_glb
+  inputs:
+  - name: compressed_glb_model
+    description: The Draco-compressed GLB model file.
+    data_type_tag: compressed_glb_model_path
+    is_primary_for_naming: true
+  outputs:
+  - name_pattern: '{original_stem}_uncompressed.glb'
+    type: model/gltf-binary
+    category: converted
+    description: Uncompressed GLB model file.
+    data_type_tag: uncompressed_glb_model_path
+  params: []
+- name: convert_obj_to_glb
+  label: "\U0001F4E6 Convert OBJ to GLB"
+  description: Converts an OBJ file (and associated MTL/textures) to GLB format.
+  module: model_tools
+  function: convert_OBJ_to_GLB
+  inputs:
+  - name: obj_model
+    description: The OBJ model file.
+    data_type_tag: obj_model_path
+    is_primary_for_naming: true
+  - name: texture_files
+    description: List of texture file paths associated with the OBJ (if not automatically
+      discoverable).
+    data_type_tag: texture_file_list_path
+    required: false
+  outputs:
+  - name_pattern: '{original_stem}.glb'
+    type: model/gltf-binary
+    category: converted
+    description: GLB model file converted from OBJ.
+    data_type_tag: converted_glb_model_path
+  params:
+  - default: true
+    help_text: Search for textures in the OBJ file's directory and subdirectories.
+    label: Auto-search for Textures
+    name: search_textures
+    type: bool
+  - default: false
+    help_text: If true, proceed with conversion even if some textures are not found.
+    label: Ignore Missing Textures
+    name: ignore_missing_textures
+    type: bool
