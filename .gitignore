@@ -10,7 +10,10 @@ databases/pipeline_system.db
 pipeline_components/*
 !pipeline_components/.gitkeep
 
-build.sh
+build_macOS.sh
+codebase.sh
+
+codebase/
 
 # =======================================
 # Environment Specific
@@ -49,6 +52,7 @@ Temporary Items
 # =======================================
 # Development & Dependency Artifacts
 # =======================================
+.vscode
 jsconfig.json
 
 node_modules/

@@ -2,6 +2,7 @@
 import os
 import subprocess
 import json
+from queue import Queue
 import sqlite3
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Tuple
@@ -167,40 +168,60 @@ class ComponentEnvironmentManager:
                 logging.info("Added installation_config column to installed_components table")
 
     def install_component(
-        self, component_name: str, skip_install_script: bool = False
-    ) -> Tuple[bool, List[Dict[str, str]]]:
+        self, component_name: str, skip_install_script: bool = False, log_queue: Optional[Queue] = None
+    ) -> bool:
         """
-        Enhanced installation that creates a dedicated 'uv' environment for each component.
-        Returns a tuple of (success_status, logs).
+        Enhanced installation that streams progress via a queue.
+        Returns a boolean indicating success.
         """
+
+        def log(level, message, progress=None):
+            if log_queue:
+                payload = {"level": level, "message": message}
+                if progress is not None:
+                    payload["progress"] = progress
+                log_queue.put(payload)
+            else:
+                # Fallback for direct calls without a queue
+                print(f"[{level.upper()}] {message}")
+
         try:
             component_path = self.components_dir / component_name
 
+            log("info", "Validating component structure...", progress=10)
             if not self._validate_component_structure(component_path):
-                msg = f"Invalid component structure for '{component_name}'. Check for missing files or malformed YAML."
-                return False, [{"level": "error", "message": msg}]
+                raise ComponentInstallationError(
+                    f"Invalid component structure for '{component_name}'. Check for missing files or malformed YAML."
+                )
 
             env_path = component_path / "env"
+            log("info", "Creating virtual environment using 'uv'...", progress=20)
             self._create_virtual_environment(env_path)
-            self._install_python_dependencies(component_path, env_path)
 
-            script_success, script_logs = True, []
+            log("info", "Installing Python dependencies...", progress=40)
+            # Pass the queue down to the dependency installer
+            self._install_python_dependencies(component_path, env_path, log_queue)
+
             if not skip_install_script:
-                script_success, script_logs = self._run_component_installation_script(component_path, env_path)
+                log("info", "Running component-specific installation script...", progress=85)
+                # Pass the queue down to the script runner
+                script_success, _ = self._run_component_installation_script(component_path, env_path, log_queue)
                 if not script_success:
-                    return False, script_logs
+                    raise ComponentInstallationError("Component installation script failed.")
             else:
-                logging.info(f"Skipping install script execution for {component_name} (external file provision)")
+                log("info", "Skipping install script execution.", progress=90)
 
+            log("info", "Registering component in the database...", progress=95)
             self._register_component_in_database(component_name, component_path, env_path)
 
-            logging.info(f"Component {component_name} installed successfully using a dedicated 'uv' environment.")
-            return True, script_logs
+            logging.info(f"Component {component_name} installed successfully.")
+            return True
 
         except Exception as e:
-            logging.error(f"Failed to install component {component_name}: {e}", exc_info=True)
-            logs = [{"level": "error", "message": f"Installation failed for '{component_name}': {e}"}]
-            return False, logs
+            error_msg = f"Failed to install component {component_name}: {e}"
+            log("error", error_msg)
+            logging.error(error_msg, exc_info=True)
+            return False
 
     def _ensure_shared_environment(self):
         """Ensure shared base environment exists and is up to date"""
@@ -395,96 +416,102 @@ class ComponentEnvironmentManager:
         except Exception as e:
             logging.warning(f"Failed to configure shared environment inheritance: {e}")
 
-    def _install_python_dependencies(self, component_path: Path, env_path: Path):
-        """Install Python dependencies using uv pip."""
+    def _install_python_dependencies(self, component_path: Path, env_path: Path, log_queue: Optional[Queue] = None):
+        """Install Python dependencies using uv pip, streaming output to the queue."""
         requirements_file = component_path / "requirements.txt"
         if not requirements_file.exists():
             logging.info("No requirements.txt found, skipping dependency installation.")
             return
 
         try:
-            # Use uv to install packages from the requirements file into the specified environment
-            subprocess.run(
-                [
-                    "uv",
-                    "pip",
-                    "install",
-                    "-r",
-                    str(requirements_file),
-                    "--python",
-                    str(self._find_working_python_executable(env_path)),
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            logging.info(f"Dependencies from {requirements_file} installed successfully using uv.")
+            command = [
+                "uv",
+                "pip",
+                "install",
+                "-r",
+                str(requirements_file),
+                "--python",
+                str(self._find_working_python_executable(env_path)),
+            ]
 
-        except subprocess.CalledProcessError as e:
-            logging.error(f"Failed to install dependencies using uv: {e.stderr}")
-            raise Exception(f"Failed to install dependencies for {component_path.name}")
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+            )
+
+            progress = 45
+            if log_queue:
+                for line in iter(process.stdout.readline, ""):
+                    if line.strip():
+                        log_queue.put({"level": "stdout", "message": line.strip()})
+                        # Slowly increment progress during dependency installation
+                        if progress < 80:
+                            progress += 0.5
+                            log_queue.put({"progress": int(progress)})
+
+            process.wait()
+
+            if process.returncode != 0:
+                raise Exception(f"uv pip install failed with exit code {process.returncode}")
+
+            if log_queue:
+                log_queue.put({"progress": 80})
+            logging.info(f"Dependencies from {requirements_file} installed successfully.")
+
         except Exception as e:
-            logging.error(f"An unexpected error occurred during dependency installation with uv: {e}")
+            logging.error(f"An unexpected error occurred during dependency installation: {e}")
             raise
 
     def _run_component_installation_script(
-        self, component_path: Path, env_path: Path
+        self, component_path: Path, env_path: Path, log_queue: Optional[Queue] = None
     ) -> Tuple[bool, List[Dict[str, str]]]:
-        """
-        Generic execution of component's install.py, capturing detailed logs.
-        Returns a tuple of (success_status, logs).
-        """
-        logs = []
+        """Execute component's install.py, streaming output to the queue."""
         install_script = component_path / "install.py"
         if not install_script.exists():
-            logs.append({"level": "info", "message": "No install.py found, skipping custom installation script."})
-            return True, logs
+            return True, []
 
         python_exe = self._find_working_python_executable(env_path)
         if not python_exe:
-            logs.append({"level": "error", "message": f"No working Python executable found in {env_path}"})
-            return False, logs
+            if log_queue:
+                log_queue.put({"level": "error", "message": f"No working Python executable found in {env_path}"})
+            return False, []
 
-        logs.append({"level": "info", "message": f"Running custom install script: {install_script}"})
         try:
-            # Ensure all paths are absolute before changing the current working directory
-            python_exe_abs = python_exe.resolve()
-            install_script_abs = install_script.resolve()
-            component_path_abs = component_path.resolve()
-
-            result = subprocess.run(
-                [str(python_exe_abs), str(install_script_abs)],
-                check=False,
-                cwd=str(component_path_abs),
-                capture_output=True,
+            command = [str(python_exe.resolve()), str(install_script.resolve())]
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
-                timeout=300,
+                encoding="utf-8",
+                errors="replace",
+                cwd=str(component_path.resolve()),
             )
 
-            if result.stdout:
-                logs.append({"level": "stdout", "message": result.stdout.strip()})
+            if log_queue:
+                for line in iter(process.stdout.readline, ""):
+                    if line.strip():
+                        log_queue.put({"level": "stdout", "message": line.strip()})
 
-            if result.returncode == 0:
-                if result.stderr:
-                    logs.append({"level": "warning", "message": f"Script produced warnings:\n{result.stderr.strip()}"})
-                logs.append({"level": "success", "message": "Component setup script completed successfully."})
-                return True, logs
+            return_code = process.wait()
+
+            if return_code == 0:
+                return True, []
             else:
-                if result.stderr:
-                    logs.append({"level": "stderr", "message": result.stderr.strip()})
-                logs.append(
-                    {"level": "error", "message": f"Install script failed with exit code {result.returncode}."}
-                )
-                return False, logs
+                if log_queue:
+                    log_queue.put(
+                        {"level": "error", "message": f"Install script failed with exit code {return_code}."}
+                    )
+                return False, []
 
-        except subprocess.TimeoutExpired:
-            logs.append({"level": "error", "message": "Install script timed out after 300 seconds."})
-            return False, logs
         except Exception as e:
-            logs.append(
-                {"level": "error", "message": f"An unexpected error occurred while running install script: {e}"}
-            )
-            return False, logs
+            if log_queue:
+                log_queue.put({"level": "error", "message": f"Error running install script: {e}"})
+            return False, []
 
     def _find_working_python_executable(self, env_path: Path) -> Optional[Path]:
         """Find a working Python executable using multiple strategies (generic)"""

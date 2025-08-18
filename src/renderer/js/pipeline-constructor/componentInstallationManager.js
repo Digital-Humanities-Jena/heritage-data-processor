@@ -239,15 +239,21 @@ export default class ComponentInstallationManager {
     }
 
     async startInstallation() {
+        // Safety Check
+        if (!this.installationRequirements) {
+            const errorMessage = 'CRITICAL: Installation requirements were not loaded. This can happen if the component configuration (component.yaml) is missing, invalid, or has a name that does not match its parent directory. Please check the component and try again.';
+            this.addInstallLog('error', `❌ ${errorMessage}`);
+            this.setInstallationState(false, true); // Mark as complete (with failure)
+            showToast('Installation failed: requirements not loaded.', 'error');
+            return;
+        }
+
         if (!this.validateInstallationReadiness()) {
             showToast('Please provide all required files before installation', 'warning');
             return;
         }
         
-        // Collect file paths
         const filePaths = {};
-        
-        // Required files
         const requiredFiles = this.installationRequirements.required_files || [];
         for (const fileReq of requiredFiles) {
             const inputElement = document.getElementById(`file_${fileReq.name}`);
@@ -256,7 +262,6 @@ export default class ComponentInstallationManager {
             }
         }
         
-        // Optional files
         const optionalFiles = this.installationRequirements.optional_files || [];
         for (const fileReq of optionalFiles) {
             const inputElement = document.getElementById(`file_${fileReq.name}`);
@@ -265,59 +270,74 @@ export default class ComponentInstallationManager {
             }
         }
         
-        console.log('[Install] Starting installation with files:', filePaths);
-        
         setInstallationStatus(true);
         this.setInstallationState(true);
-        this.showInstallationProgress();
+        this.updateInstallProgress(0, 'Starting installation...');
+        this.addInstallLog('info', 'Sending installation request to the server...');
+
+        // Manually un-hide the progress and log sections
+        document.querySelector('.install-progress').classList.remove('hidden');
+        document.querySelector('.install-log').classList.remove('hidden');
         
         try {
-            const installData = {
-                component_name: this.currentComponent.name,
-                file_paths: filePaths,
-                installation_requirements: this.installationRequirements
-            };
-            
-            this.addInstallLog('info', 'Starting installation process...');
-            this.updateInstallProgress(10, 'Preparing files...');
-            
             const response = await fetch(`${PYTHON_API_BASE_URL}/api/pipeline_components/${this.currentComponent.name}/install`, {
                 method: 'POST',
-                headers: { 
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(installData)
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ file_paths: filePaths })
             });
             
             const result = await response.json();
-            console.log('[Install] Installation result:', result);
-
-            // Always process logs if they exist
-            if (result.logs && Array.isArray(result.logs)) {
-                result.logs.forEach(log => this.addInstallLog(log.level, log.message));
+            if (!response.ok || !result.success) {
+                const errorMessage = result.logs && result.logs.length > 0 ? result.logs[0].message : (result.error || 'Failed to initiate installation on the server.');
+                throw new Error(errorMessage);
             }
 
-            if (!result.success) {
-                throw new Error(result.error || 'Installation failed on the server.');
-            }
-
-            if (!result.logs) { // Add a final success message if the backend didn't provide one
-                this.addInstallLog('success', '✅ Installation completed successfully!');
-             }
-            
-            // This will show the "Done" button and hide the "Cancel" button.
-            this.setInstallationState(false, true); // isInstalling = false, isComplete = true
-            setInstallationStatus(false);
-            showToast('Component installed successfully', 'success');
+            this.startLogStreaming(result.installation_id);
             
         } catch (error) {
-            console.error('[Install] Installation error:', error);
-            this.addInstallLog('error', `❌ Top-level error: ${error.message}`);
-            this.updateInstallProgress(0, 'Installation failed');
-            this.setInstallationState(false);
+            console.error('[Install] Initiation error:', error);
+            this.addInstallLog('error', `❌ Failed to start installation: ${error.message}`);
+            this.updateInstallProgress(0, 'Failed to start');
+            this.setInstallationState(false, true);
             setInstallationStatus(false);
             showToast(`Installation failed: ${error.message}`, 'error');
         }
+    }
+
+    startLogStreaming(installationId) {
+        const eventSource = new EventSource(`${PYTHON_API_BASE_URL}/api/pipeline_components/install/stream/${installationId}`);
+
+        eventSource.onmessage = (event) => {
+            const data = JSON.parse(event.data);
+
+            if (data.message) {
+                this.addInstallLog(data.level || 'info', data.message);
+            }
+            if (data.progress !== undefined) {
+                const statusMessage = data.message || `Installation in progress...`;
+                this.updateInstallProgress(data.progress, statusMessage);
+            }
+
+            // This block runs ONLY when the final "completed" or "failed" message is received
+            if (data.status === 'completed' || data.status === 'failed') {
+                eventSource.close();
+                this.setInstallationState(false, true); // Mark as complete (success or failure)
+                setInstallationStatus(false);
+                if(data.status === 'completed') {
+                    showToast('Component installed successfully!', 'success');
+                } else {
+                    showToast('Component installation failed.', 'error');
+                }
+            }
+        };
+
+        eventSource.onerror = (err) => {
+            console.error('EventSource failed:', err);
+            this.addInstallLog('error', 'Lost connection to the installation process. The installation may have failed on the server.');
+            eventSource.close();
+            this.setInstallationState(false, true); // Mark as complete with failure
+            setInstallationStatus(false);
+        };
     }
 
     showSimpleInstallModal(component) {
@@ -463,28 +483,12 @@ export default class ComponentInstallationManager {
         }
     }
 
-    showInstallationProgress() {
-        document.querySelector('.install-progress').classList.remove('hidden');
-        document.querySelector('.install-log').classList.remove('hidden');
-        
-        // Simulate progress
-        let progress = 0;
-        const progressInterval = setInterval(() => {
-            progress += Math.random() * 10;
-            if (progress >= 90) {
-                clearInterval(progressInterval);
-                progress = 90; // Leave some for completion
-            }
-            this.updateInstallProgress(progress, 'Installing dependencies...');
-        }, 500);
-    }
-
     updateInstallProgress(percentage, message) {
         const progressBar = document.getElementById('installProgressBar');
         const progressText = document.getElementById('installProgressText');
         
-        progressBar.style.width = `${percentage}%`;
-        progressText.textContent = message;
+        if (progressBar) progressBar.style.width = `${percentage}%`;
+        if (progressText) progressText.textContent = message;
     }
 
     addInstallLog(level = 'info', message) {

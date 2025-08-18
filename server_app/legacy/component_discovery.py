@@ -66,6 +66,15 @@ class ComponentDiscovery:
 
             # Validate component structure
             validation_errors = self._validate_component_config(component_dir, config)
+            component_name_in_yaml = config.get("name", component_dir.name)
+            if component_name_in_yaml != component_dir.name:
+                validation_errors.append(
+                    f"Directory name '{component_dir.name}' must match the 'name' in component.yaml ('{component_name_in_yaml}')"
+                )
+
+            # The component name for the API should be what's in the directory
+            component_name = component_dir.name
+
             is_valid = len(validation_errors) == 0
 
             component_name = config.get("name", component_dir.name)
@@ -143,16 +152,16 @@ class ComponentDiscovery:
         return errors
 
     def get_components_by_category(self) -> Dict[str, List[Dict[str, Any]]]:
-        """Get components organized by category"""
+        """Get components organized by category, including invalid ones."""
         components = self.discover_local_components()
         by_category = {}
 
+        # All components are included, even those with validation errors (to resolve them)
         for component in components:
-            if component["is_valid"]:
-                category = component["category"]
-                if category not in by_category:
-                    by_category[category] = []
-                by_category[category].append(component)
+            category = component["category"]
+            if category not in by_category:
+                by_category[category] = []
+            by_category[category].append(component)
 
         return by_category
 

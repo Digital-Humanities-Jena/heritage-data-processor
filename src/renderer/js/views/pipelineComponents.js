@@ -153,6 +153,8 @@ export async function loadAndDisplayPipelineComponents() {
 function createComponentCard(component) {
     const card = document.createElement('div');
     const isInstalled = component.status === 'installed';
+    const isInvalid = component.is_valid === false;
+    const errorTooltip = isInvalid ? `Fix validation errors before installing: ${component.validation_errors.join('; ')}` : '';
     const statusColor = isInstalled ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800';
     
     card.className = `component-card ${isInstalled ? 'border-green-200' : 'border-blue-200'}`;
@@ -167,8 +169,17 @@ function createComponentCard(component) {
             <p class="text-sm text-gray-600 mb-3 line-clamp-2">${component.description || 'No description available'}</p>
             <div class="text-xs text-gray-500 mb-3">
                 <div>Version: ${component.version || '1.0.0'}</div>
-                ${component.is_valid === false ? '<div class="text-red-500">⚠️ Invalid component</div>' : ''}
-            </div>
+                
+                ${isInvalid ? 
+                    `<button 
+                        class="invalid-component-details-btn text-red-600 font-semibold mt-1 text-left hover:text-red-800 transition-colors"
+                        data-errors='${JSON.stringify(component.validation_errors).replace(/'/g, "&apos;")}'
+                     >
+                        ⚠️ Invalid: ${component.validation_errors[0]}
+                     </button>` 
+                    : ''
+                }
+                </div>
         </div>
         <div class="card-actions">
             <button class="info-btn btn-secondary flex-1">Info</button>
@@ -184,10 +195,22 @@ function createComponentCard(component) {
                         <path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
                     </svg>
                  </button>` :
-                `<button class="install-btn btn-primary flex-1">Install</button>`
+                `<button class="install-btn btn-primary flex-1" ${isInvalid ? `disabled title="${errorTooltip}"` : ''}>Install</button>`
             }
         </div>
     `;
+
+    const invalidDetailsBtn = card.querySelector('.invalid-component-details-btn');
+    if (invalidDetailsBtn) {
+        invalidDetailsBtn.addEventListener('click', (e) => {
+            // Retrieve the full error list from the data attribute
+            const errors = JSON.parse(e.currentTarget.dataset.errors);
+            
+            // Format the errors for display in an alert
+            const errorMessage = `The component '${component.label}' has the following validation errors:\n\n- ${errors.join('\n- ')}`;
+            alert(errorMessage);
+        });
+    }
     
     // Event listeners
     card.querySelector('.info-btn').addEventListener('click', () => showInfoModal(component));
@@ -204,16 +227,18 @@ function createComponentCard(component) {
         card.querySelector('.config-btn').addEventListener('click', () => showConfigModal(component));
         card.querySelector('.uninstall-btn').addEventListener('click', () => uninstallComponent(component));
     } else {
-        card.querySelector('.install-btn').addEventListener('click', () => {
-            if (window.componentInstallationManager) {
-                // Use enhanced installation with requirements
-                window.componentInstallationManager.showInstallModal(component);
-            } else {
-                // Fallback to simple installation
-                console.warn('Installation manager not available, using fallback');
-                installComponent(component);
-            }
-        });
+        const installBtn = card.querySelector('.install-btn');
+        // Only add the click listener if the button is not disabled
+        if (installBtn && !installBtn.disabled) {
+            installBtn.addEventListener('click', () => {
+                if (window.componentInstallationManager) {
+                    window.componentInstallationManager.showInstallModal(component);
+                } else {
+                    console.warn('Installation manager not available, using fallback');
+                    installComponent(component);
+                }
+            });
+        }
     }
     
     return card;

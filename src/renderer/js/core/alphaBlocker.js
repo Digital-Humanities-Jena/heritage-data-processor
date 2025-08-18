@@ -31,6 +31,7 @@ export function applyAlphaBlockers() {
     disableButton('operabilityBtn', 'Operability Tests are disabled in this version.');
     disableButton('modelsBtn', 'Model Management is disabled in this version.');
     disableButton('optimizeBtn', 'Storage optimization is disabled in this version.');
+    disableButton('showLogBtn', 'Execution Logs are disabled in this version.');
 
     // Disable specific navigation links
     disableNavLink('apilog', 'API Log is disabled in this version.');
