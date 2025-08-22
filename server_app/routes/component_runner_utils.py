@@ -12,8 +12,10 @@ logger = logging.getLogger(__name__)
 
 
 def normalize_cli_arg(name: str) -> str:
-    """Normalize a string into a command-line-friendly argument (e.g., 'param_name' -> 'param-name')."""
-    return name.replace("_", "-").lower()
+    """Normalize a string into a command-line-friendly argument."""
+    # This function is simplified to just convert to lowercase,
+    # preserving underscores as defined in component.yaml and main.py.
+    return name.lower()
 
 
 def get_component_spec(component_name: str) -> Dict[str, Any]:
@@ -71,7 +73,9 @@ def determine_output_strategy(
     output_spec_list = component_spec.get("outputs", [])
     output_filename = "output.txt"  # Default fallback
     if output_spec_list:
-        name_pattern = output_spec_list[0].get("name_pattern", "{original_stem}_output.txt")
+        # Correctly access the component name from the metadata block
+        component_name = component_spec.get("metadata", {}).get("name", "unknown_component")
+        name_pattern = output_spec_list[0].get("pattern", "{original_stem}_output.txt")
         input_stem = Path(next(iter(inputs.values()), "output")).stem
         output_filename = name_pattern.replace("{original_stem}", input_stem)
 
@@ -98,7 +102,8 @@ def determine_output_strategy(
         }
 
     # Fallback if introspection fails or finds no pattern
-    logger.warning(f"No specific output strategy found for {component_spec['name']}. Defaulting to --output.")
+    component_name = component_spec.get("metadata", {}).get("name", "unknown_component")
+    logger.warning(f"No specific output strategy found for {component_name}. Defaulting to --output.")
     return {
         "strategy": "single_file_fallback",
         "args": ["--output", str(output_path)],
@@ -108,17 +113,24 @@ def determine_output_strategy(
 
 def add_parameters_to_command(cmd: List[str], parameters: Dict, component_spec: Dict):
     """Adds parameters to the command list based on their type."""
-    loader = ComponentConfigLoader(Path("pipeline_components") / component_spec["name"])
+    component_name = component_spec.get("metadata", {}).get("name")
+    if not component_name:
+        logger.error("Could not determine component name from specification for parameter loading.")
+        return
+
+    loader = ComponentConfigLoader(Path("pipeline_components") / component_name)
     param_specs = loader.get_parameter_mapping()
     for name, value in parameters.items():
         if value is None or value == "" or value == []:
             continue
 
-        cli_arg = f"--{normalize_cli_arg(name)}"
+        # Use the name directly from the YAML, without normalization
+        cli_arg = f"--{name}"
         param_type = param_specs.get(name, {}).get("type", "str")
 
-        if param_type == "bool":
-            if value:  # Add flag only if True
+        if param_type == "boolean":
+            # For boolean flags, the argument should only be added if the value is true.
+            if value:
                 cmd.append(cli_arg)
         elif isinstance(value, list):
             cmd.append(cli_arg)
@@ -133,30 +145,42 @@ def build_full_command(
     """Orchestrates building the full, final command for execution."""
     component_path = Path("pipeline_components") / component_name
     component_spec = get_component_spec(component_name)
+    main_script_path = component_path / "main.py"
 
-    cmd = [sys.executable, str(component_path / "main.py")]
+    # --- SPECIAL HANDLING FOR TEST MODE ---
+    # If a parameter like 'test' or 'test_n' is True, ignore all other inputs
+    # and construct a simple test command.
+    is_test_run = False
+    for param_name, param_value in parameters.items():
+        if param_name.startswith("test") and param_value:
+            is_test_run = True
+            break
+
+    if is_test_run:
+        cmd = [sys.executable, str(main_script_path), "--test"]
+        # Return a simplified tuple for test mode
+        return cmd, component_spec, {"strategy": "test_mode"}, parameters, {}
+
+    # --- REGULAR EXECUTION LOGIC ---
+    cmd = [sys.executable, str(main_script_path)]
 
     from .component_manager import get_component_installation_config
 
-    # STEP 1: Merge runtime parameters with stored installation configuration
     install_config = get_component_installation_config(component_name)
     install_file_paths = install_config.get("file_paths", {})
     merged_parameters = {**install_file_paths, **parameters}
 
-    # STEP 2: Add inputs to command
     for name, path in inputs.items():
         if path:
-            cmd.extend([f"--{normalize_cli_arg(name)}", str(path)])
+            # Use the name directly as the CLI argument
+            cmd.extend([f"--{name}", str(path)])
 
-    # STEP 3: Determine and add output arguments using the corrected logic
     cli_patterns = introspect_component_cli(component_path)
     output_strategy = determine_output_strategy(component_spec, inputs, output_directory, cli_patterns)
     cmd.extend(output_strategy["args"])
 
-    # STEP 4: Add the merged parameters to command
     add_parameters_to_command(cmd, merged_parameters, component_spec)
 
-    # STEP 5: Add verbose flag if supported
     if cli_patterns.get("supports_verbose", True):
         cmd.append("--verbose")
 

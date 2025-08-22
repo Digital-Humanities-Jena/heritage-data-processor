@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 
 # Helpers
 PIPELINE_DB_PATH = Path("databases") / Path("pipeline_system.db")
+PIPELINE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def _restore_record_metadata(record_id: int):

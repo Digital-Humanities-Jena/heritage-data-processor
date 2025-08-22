@@ -3084,3 +3084,8 @@ input:checked + .slider:before {
 .alpha-disabled-nav:hover {
     background-color: #f3f4f6 !important; /* gray-100 */
 }
+
+.disabled-visual {
+    opacity: 0.5;
+    pointer-events: none;
+}

@@ -11,6 +11,7 @@ export default class ComponentInstallationManager {
         this.currentComponent = null;
         this.installationRequirements = null;
         this.isInstalling = false;
+        this.installationCompleted = false;
         this.setupEventListeners();
     }
 
@@ -20,7 +21,6 @@ export default class ComponentInstallationManager {
         document.getElementById('cancelInstallBtn')?.addEventListener('click', () => this.cancelInstallation());
         document.getElementById('doneInstallBtn')?.addEventListener('click', () => {
             this.closeInstallModal();
-            loadAndDisplayPipelineComponents();
         });
     }
 
@@ -325,6 +325,7 @@ export default class ComponentInstallationManager {
                 setInstallationStatus(false);
                 if(data.status === 'completed') {
                     showToast('Component installed successfully!', 'success');
+                    this.installationCompleted = true;
                 } else {
                     showToast('Component installation failed.', 'error');
                 }
@@ -540,6 +541,12 @@ export default class ComponentInstallationManager {
         const modal = document.getElementById('componentInstallModal');
         modal.classList.add('hidden');
         this.currentComponent = null;
+
+        // check if a refresh of view is needed
+        if (this.installationCompleted) {
+            loadAndDisplayPipelineComponents();
+            this.installationCompleted = false; // Reset flag after refresh
+        }
     }
 
     showInstallationError(errorData) {

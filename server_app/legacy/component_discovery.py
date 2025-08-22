@@ -37,7 +37,8 @@ class ComponentDiscovery:
             return discovered
 
         for component_dir in self.components_dir.iterdir():
-            if component_dir.is_dir() and not component_dir.name.startswith("."):
+            # exclude _shared
+            if component_dir.is_dir() and not component_dir.name.startswith(".") and component_dir.name != "_shared":
                 component_info = self._extract_component_info(component_dir)
                 if component_info:
                     discovered.append(component_info)
@@ -45,7 +46,7 @@ class ComponentDiscovery:
         return discovered
 
     def _extract_component_info(self, component_dir: Path) -> Optional[Dict[str, Any]]:
-        """Extract component information from directory"""
+        """Extract component information from directory using the new component.yaml structure."""
         try:
             yaml_file = component_dir / "component.yaml"
             if not yaml_file.exists():
@@ -64,36 +65,48 @@ class ComponentDiscovery:
             with open(yaml_file, "r") as f:
                 config = yaml.safe_load(f)
 
-            # Validate component structure
+            # Main metadata block
+            metadata = config.get("metadata", {})
+            component_name_in_yaml = metadata.get("name", component_dir.name)
+
+            # Validate component structure and name congruence
             validation_errors = self._validate_component_config(component_dir, config)
-            component_name_in_yaml = config.get("name", component_dir.name)
             if component_name_in_yaml != component_dir.name:
                 validation_errors.append(
                     f"Directory name '{component_dir.name}' must match the 'name' in component.yaml ('{component_name_in_yaml}')"
                 )
 
-            # The component name for the API should be what's in the directory
-            component_name = component_dir.name
-
             is_valid = len(validation_errors) == 0
-
-            component_name = config.get("name", component_dir.name)
+            component_name = component_dir.name  # The directory name is the source of truth for the API
             is_installed = self.component_manager.is_component_installed(component_name)
 
+            # Construct the full component info object from the new structure
             return {
                 "name": component_name,
-                "label": config.get("label", component_name),
-                "description": config.get("description", ""),
-                "category": config.get("category", "General"),
-                "version": config.get("version", "1.0.0"),
+                "label": metadata.get("label", component_name),
+                "description": metadata.get("description", ""),
+                "category": metadata.get("category", "General"),
+                "version": metadata.get("version", "1.0.0"),
+                "authors": metadata.get("authors", []),
+                "license": metadata.get("license", {}),
+                "status": metadata.get("status", "stable"),
+                "created": metadata.get("created"),
+                "updated": metadata.get("updated"),
+                "tags": metadata.get("tags", []),
+                "keywords": metadata.get("keywords", []),
+                "sources": config.get("sources", {}),
                 "path": str(component_dir),
                 "is_valid": is_valid,
                 "is_installed": is_installed,
                 "validation_errors": validation_errors,
                 "inputs": config.get("inputs", []),
                 "outputs": config.get("outputs", []),
-                "parameters": config.get("params", []),
+                "parameter_groups": config.get("parameter_groups", []),
                 "requirements": config.get("requirements", {}),
+                "execution": config.get("execution", {}),
+                "params": [
+                    param for group in config.get("parameter_groups", []) for param in group.get("parameters", [])
+                ],
             }
 
         except Exception as e:
@@ -111,43 +124,45 @@ class ComponentDiscovery:
             }
 
     def _validate_component_config(self, component_dir: Path, config: Dict[str, Any]) -> List[str]:
-        """Validate component configuration and structure"""
+        """Validate component configuration and structure against the new schema."""
         errors = []
 
-        # Check required YAML fields
-        required_fields = ["name", "label", "description", "inputs", "outputs"]
-        for field in required_fields:
-            if field not in config:
-                errors.append(f"Missing required field: {field}")
+        # Check for top-level keys
+        if "metadata" not in config:
+            errors.append("Missing required top-level key: metadata")
+            return errors  # Stop validation if metadata is missing
 
-        # Check required files
-        required_files = ["main.py", "processor.py"]
+        metadata = config.get("metadata", {})
+        # Check required fields within metadata
+        required_fields = ["name", "label", "description", "category", "version"]
+        for field in required_fields:
+            if field not in metadata:
+                errors.append(f"Missing required metadata field: {field}")
+
+        # Check for existence of other primary keys
+        for key in ["inputs", "outputs", "parameter_groups", "requirements", "execution"]:
+            if key not in config:
+                errors.append(f"Missing required top-level key: {key}")
+
+        # Check required files from the 'structure' block, resolving paths correctly
+        structure = config.get("structure", {})
+        required_files = structure.get("required_files", ["main.py", "processor.py"])
         for file_name in required_files:
-            if not (component_dir / file_name).exists():
+            # Skip wildcard entries, as they don't represent a single file to check for existence.
+            if "*" in file_name:
+                continue
+
+            # Construct the full path relative to the component's directory.
+            full_path = component_dir / file_name
+
+            if not full_path.exists():
                 errors.append(f"Missing required file: {file_name}")
 
-        # Validate inputs structure
-        inputs = config.get("inputs", [])
-        if not isinstance(inputs, list):
-            errors.append("inputs must be a list")
-        else:
-            for i, inp in enumerate(inputs):
-                if not isinstance(inp, dict):
-                    errors.append(f"Input {i} must be a dictionary")
-                elif "name" not in inp:
-                    errors.append(f"Input {i} missing required field: name")
-
-        # Validate outputs structure
-        outputs = config.get("outputs", [])
-        if not isinstance(outputs, list):
-            errors.append("outputs must be a list")
-        else:
-            for i, out in enumerate(outputs):
-                if not isinstance(out, dict):
-                    errors.append(f"Output {i} must be a dictionary")
-                # Checks for either 'name' OR 'name_pattern'
-                elif "name" not in out and "name_pattern" not in out:
-                    errors.append(f"Output {i} missing required field: 'name' or 'name_pattern'")
+        # Simplified structure validation for inputs and outputs
+        if not isinstance(config.get("inputs", []), list):
+            errors.append("'inputs' must be a list")
+        if not isinstance(config.get("outputs", []), list):
+            errors.append("'outputs' must be a list")
 
         return errors
 

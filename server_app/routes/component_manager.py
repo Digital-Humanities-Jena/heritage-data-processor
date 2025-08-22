@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 # Define module-level constants for component management
 COMPONENTS_DIR = Path("pipeline_components")
 DB_PATH = Path("databases") / "component_registry.db"
+DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 class ComponentInstallationService:

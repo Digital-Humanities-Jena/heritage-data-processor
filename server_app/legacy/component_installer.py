@@ -12,6 +12,7 @@ from .component_manager import ComponentEnvironmentManager
 
 _components_dir = Path("pipeline_components")
 _db_path = Path("databases") / "component_registry.db"
+_db_path.parent.mkdir(parents=True, exist_ok=True)
 _manager = None
 _discovery = None
 

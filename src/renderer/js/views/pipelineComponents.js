@@ -245,165 +245,142 @@ function createComponentCard(component) {
 }
 
 export async function showInfoModal(component) {
-    // Set modal title
-    if (infoModalTitle) {
-        infoModalTitle.textContent = component.label || component.name;
-    }
-    
-    if (infoModalBody) {
-        infoModalBody.innerHTML = '<p class="text-gray-500">Loading component information...</p>';
-    }
-    
-    if (infoModal) {
-        infoModal.classList.remove('hidden');
-    }
-    
+    if (infoModalTitle) infoModalTitle.textContent = component.label || component.name;
+    if (infoModalBody) infoModalBody.innerHTML = '<p class="text-gray-500">Loading component information...</p>';
+    if (infoModal) infoModal.classList.remove('hidden');
+
     try {
-        // Get full component details from the discovery system
-        const response = await fetch(`${PYTHON_API_BASE_URL}/api/pipeline_components`);
-        const allComponents = await response.json();
+        const fullComponent = component;
+
+        // --- Helper Rendering Functions ---
+
+        const renderAuthors = (authors) => {
+            if (!authors || authors.length === 0) return '<p class="text-sm text-gray-500">No authors listed.</p>';
+            return authors.map(author => `
+                <div class="p-2 bg-gray-50 rounded-md text-sm">
+                    <p class="font-semibold text-gray-800">${author.name}</p>
+                    ${author.affiliation ? `<p class="text-xs text-gray-600">${author.affiliation}</p>` : ''}
+                    ${author.orcid ? `<a href="https://orcid.org/${author.orcid}" target="_blank" class="text-xs text-blue-600 hover:underline">ORCID: ${author.orcid}</a>` : ''}
+                </div>
+            `).join('');
+        };
+
+        const renderPythonRequirements = (reqs) => {
+            if (!reqs?.python_environment) return '<p class="text-sm text-gray-500">No Python requirements specified.</p>';
+            const pyEnv = reqs.python_environment;
+            const packages = pyEnv.packages?.map(pkg => `<li><code class="text-xs">${pkg.name}</code> ${pkg.version || ''}</li>`).join('') || '<li>No packages listed.</li>';
+            return `
+                <div class="text-sm">
+                    <p class="mb-2"><strong>Python Version:</strong> <code class="bg-gray-100 p-1 rounded">${pyEnv.python_version || 'Not specified'}</code></p>
+                    <strong class="block mb-1">Required Packages:</strong>
+                    <ul class="list-disc list-inside space-y-1">${packages}</ul>
+                </div>
+            `;
+        };
         
-        let fullComponent = null;
+        const renderSources = (sources) => {
+            if (!sources || Object.keys(sources).length === 0) return '<p class="text-sm text-gray-500">No sources provided.</p>';
+            const sourceLinks = Object.entries(sources).map(([key, value]) => {
+                if (!value) return null;
+                const url = key === 'doi' || key === 'concept_doi' ? `https://doi.org/${value}` : value;
+                return `<li><strong class="capitalize">${key.replace('_', ' ')}:</strong> <a href="${url}" target="_blank" class="text-blue-600 hover:underline break-all">${value}</a></li>`;
+            }).filter(Boolean).join('');
+            return `<ul class="space-y-1 text-sm">${sourceLinks}</ul>`;
+        };
         
-        // Find the complete component definition
-        Object.keys(allComponents).forEach(category => {
-            if (category !== 'metadata') {
-                allComponents[category].forEach(comp => {
-                    if (comp.name === component.name) {
-                        fullComponent = { ...comp, category: category };
-                    }
-                });
-            }
-        });
-        
-        if (!fullComponent) {
-            throw new Error('Component details not found');
-        }
-        
-        // Render complete component information
-        const inputs = fullComponent.inputs || [];
-        const outputs = fullComponent.outputs || [];
-        const requirements = fullComponent.requirements || {};
-        const params = fullComponent.params || [];
-        
+        const renderTags = (items, type) => {
+            if (!items || items.length === 0) return '';
+            return `
+                <div class="info-section">
+                    <h4 class="info-header capitalize">${type}</h4>
+                    <div class="flex flex-wrap gap-2">
+                        ${items.map(item => `<span class="tag-general">${item}</span>`).join('')}
+                    </div>
+                </div>
+            `;
+        };
+
+        // --- Main Modal Body ---
+
         infoModalBody.innerHTML = `
             <div class="space-y-6">
-                <!-- Description Section -->
                 <div class="info-section">
-                    <h4 class="font-semibold text-gray-700 mb-2 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
-                        </svg>
-                        Description
-                    </h4>
+                    <h4 class="info-header">Description</h4>
                     <p class="text-gray-600 leading-relaxed">${fullComponent.description || 'No description available.'}</p>
                 </div>
-                
-                <!-- Basic Information -->
+
                 <div class="info-section">
-                    <h4 class="font-semibold text-gray-700 mb-3">Component Details</h4>
-                    <div class="grid md:grid-cols-2 gap-4 text-sm">
-                        <div><span class="font-medium text-gray-500">Name:</span> <code class="bg-gray-100 px-2 py-1 rounded">${fullComponent.name}</code></div>
-                        <div><span class="font-medium text-gray-500">Category:</span> <span class="text-gray-700">${fullComponent.category}</span></div>
-                        <div><span class="font-medium text-gray-500">Version:</span> <span class="text-gray-700">${fullComponent.version || '1.0.0'}</span></div>
-                        <div><span class="font-medium text-gray-500">Status:</span> <span class="inline-flex px-2 py-1 text-xs rounded-full ${fullComponent.status === 'installed' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}">${fullComponent.status || 'available'}</span></div>
-                    </div>
+                     <h4 class="info-header">Component Details</h4>
+                     <div class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3 text-sm">
+                        <div><strong class="text-gray-500">Name:</strong> <code class="bg-gray-100 p-1 rounded">${fullComponent.name}</code></div>
+                        <div><strong class="text-gray-500">Category:</strong> ${fullComponent.category}</div>
+                        <div><strong class="text-gray-500">Version:</strong> ${fullComponent.version}</div>
+                        <div><strong class="text-gray-500">Status:</strong> <span class="capitalize font-medium">${fullComponent.status}</span></div>
+                        ${fullComponent.license ? `<div><strong class="text-gray-500">License:</strong> <a href="${fullComponent.license.url || '#'}" target="_blank" class="text-blue-600 hover:underline">${fullComponent.license.type}</a></div>` : ''}
+                        ${fullComponent.created ? `<div><strong class="text-gray-500">Created:</strong> ${new Date(fullComponent.created).toLocaleDateString()}</div>` : ''}
+                        ${fullComponent.updated ? `<div><strong class="text-gray-500">Updated:</strong> ${new Date(fullComponent.updated).toLocaleDateString()}</div>` : ''}
+                     </div>
                 </div>
                 
-                <!-- Inputs Section -->
                 <div class="info-section">
-                    <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15m0-3l-3-3-3 3m6 0l-3-3-3 3m6 0v3" />
-                        </svg>
-                        Inputs (${inputs.length})
-                    </h4>
-                    ${inputs.length > 0 ? 
-                        `<div class="space-y-3">
-                            ${inputs.map(input => `
-                                <div class="border border-gray-200 rounded-lg p-3 bg-gray-50">
-                                    <div class="flex items-center justify-between mb-2">
-                                        <span class="font-medium text-gray-800">${input.name}</span>
-                                        ${input.required ? '<span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">Required</span>' : '<span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded">Optional</span>'}
+                    <h4 class="info-header">Sources & Links</h4>
+                    ${renderSources(fullComponent.sources)}
+                </div>
+
+                <div class="info-section">
+                    <h4 class="info-header">Authors</h4>
+                    <div class="space-y-2">${renderAuthors(fullComponent.authors)}</div>
+                </div>
+
+                <div class="info-section">
+                    <h4 class="info-header">Inputs (${(fullComponent.inputs || []).length})</h4>
+                    ${(fullComponent.inputs || []).length > 0 ? 
+                        `<div class="space-y-2">${fullComponent.inputs.map(input => `
+                            <div class="info-card">
+                                <div class="flex justify-between items-start">
+                                    <div>
+                                        <p class="font-semibold text-gray-800">${input.label || input.name}</p>
+                                        <p class="text-xs text-gray-500 font-mono">${input.name}</p>
                                     </div>
-                                    <p class="text-sm text-gray-600 mb-2">${input.description || 'No description'}</p>
-                                    <div class="text-xs text-gray-500">
-                                        <span>Type: <code>${input.data_type_tag || 'unknown'}</code></span>
-                                        ${input.validation_rules?.file_extensions ? 
-                                            `<span class="ml-3">Extensions: ${input.validation_rules.file_extensions.join(', ')}</span>` : ''}
-                                    </div>
+                                    ${input.required ? '<span class="tag-required">Required</span>' : '<span class="tag-optional">Optional</span>'}
                                 </div>
-                            `).join('')}
-                        </div>` :
-                        '<p class="text-sm text-gray-500">No inputs defined</p>'
+                                <p class="text-xs text-gray-600 mt-2">${input.description || ''}</p>
+                                ${input.mutex_with ? `<p class="text-xs text-amber-700 mt-1"><strong>Mutually Exclusive with:</strong> ${input.mutex_with.join(', ')}</p>` : ''}
+                            </div>`).join('')}
+                        </div>` : 
+                        '<p class="text-sm text-gray-500">No inputs defined.</p>'
                     }
                 </div>
-                
-                <!-- Outputs Section -->
+
                 <div class="info-section">
-                    <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9 8.25H7.5a2.25 2.25 0 00-2.25 2.25v9a2.25 2.25 0 002.25 2.25h9a2.25 2.25 0 002.25-2.25v-9a2.25 2.25 0 00-2.25-2.25H15M9 12l2 2 4-4m6-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        Outputs (${outputs.length})
-                    </h4>
-                    ${outputs.length > 0 ? 
-                        `<div class="space-y-3">
-                            ${outputs.map(output => `
-                                <div class="border border-gray-200 rounded-lg p-3 bg-green-50">
-                                    <div class="font-medium text-gray-800 mb-2">${output.name_pattern || output.name || 'Output'}</div>
-                                    <p class="text-sm text-gray-600 mb-2">${output.description || 'No description'}</p>
-                                    <div class="text-xs text-gray-500">
-                                        <span>Type: <code>${output.type || 'unknown'}</code></span>
-                                        <span class="ml-3">Category: ${output.category || 'general'}</span>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>` :
-                        '<p class="text-sm text-gray-500">No outputs defined</p>'
-                    }
+                     <h4 class="info-header">Outputs (${(fullComponent.outputs || []).length})</h4>
+                     ${(fullComponent.outputs || []).length > 0 ? 
+                        `<div class="space-y-2">${fullComponent.outputs.map(output => `
+                            <div class="info-card bg-green-50 border-green-200">
+                                <p class="font-semibold text-gray-800">${output.label || output.name}</p>
+                                <p class="text-xs text-gray-500 font-mono">${output.name}</p>
+                                <p class="text-xs text-gray-600 mt-2">${output.description || ''}</p>
+                                <p class="text-xs text-gray-500 mt-2">Pattern: <code class="text-xs">${output.pattern || output.name}</code></p>
+                            </div>`).join('')}
+                        </div>` : 
+                        '<p class="text-sm text-gray-500">No outputs defined.</p>'
+                     }
+                </div>
+
+                <div class="info-section">
+                    <h4 class="info-header">Python Requirements</h4>
+                    ${renderPythonRequirements(fullComponent.requirements)}
                 </div>
                 
-                <!-- Parameters Section -->
-                ${params.length > 0 ? `
-                <div class="info-section">
-                    <h4 class="font-semibold text-gray-700 mb-3 flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 mr-2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.646.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.431l-1.003.827c-.293.24-.438.613-.431.992a6.759 6.759 0 010 1.255c-.007.378.138.75.43.99l1.005.828c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.333.183-.582.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.431l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-1.255c.007-.378-.137-.75-.43-.99l-1.004-.828a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.281z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Parameters (${params.length})
-                    </h4>
-                    <div class="space-y-2">
-                        ${params.map(param => `
-                            <div class="flex items-center justify-between p-2 bg-blue-50 rounded border">
-                                <div>
-                                    <span class="font-medium text-gray-800">${param.label || param.name}</span>
-                                    <span class="text-xs text-gray-500 ml-2">(${param.type})</span>
-                                    ${param.help_text ? `<p class="text-xs text-gray-600 mt-1">${param.help_text}</p>` : ''}
-                                </div>
-                                <code class="text-xs bg-white px-2 py-1 rounded border">${JSON.stringify(param.default)}</code>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>` : ''}
-                
-                <!-- Requirements Section -->
-                <div class="info-section border-t pt-4">
-                    <h4 class="font-semibold text-gray-700 mb-3">Requirements</h4>
-                    <div class="grid md:grid-cols-2 gap-3 text-sm">
-                        <div><span class="font-medium text-gray-500">Python:</span> <code>${requirements.python_version || '>=3.8'}</code></div>
-                        <div><span class="font-medium text-gray-500">Timeout:</span> ${fullComponent.execution?.timeout_seconds || 60}s</div>
-                        <div><span class="font-medium text-gray-500">Memory:</span> ${fullComponent.execution?.memory_limit_mb || 512}MB</div>
-                        <div><span class="font-medium text-gray-500">CPU:</span> ${fullComponent.execution?.cpu_limit || 1} core(s)</div>
-                    </div>
-                </div>
+                ${renderTags(fullComponent.tags, 'tags')}
+                ${renderTags(fullComponent.keywords, 'keywords')}
             </div>
         `;
-        
+
     } catch (error) {
-        console.error('Error loading component info:', error);
+        console.error('Error rendering component info:', error);
         if (infoModalBody) {
-            infoModalBody.innerHTML = `<p class="text-red-500">Error loading component information: ${error.message}</p>`;
+            infoModalBody.innerHTML = `<p class="text-red-500">Error displaying component details: ${error.message}</p>`;
         }
     }
 }
@@ -493,7 +470,7 @@ export async function showConfigModal(component, stepId) {
             remapBtn.addEventListener('click', () => {
                 optionsModal.classList.add('hidden'); // Close current modal
                 // Call the method on the global pipelineConstructor instance
-                window.pipelineConstructor.showInputMappingModal(stepId, component); 
+                window.pipelineConstructor.showInputMappingModal(stepId, component);
             });
         }
 
@@ -515,7 +492,7 @@ export async function showConfigModal(component, stepId) {
                     <legend class="text-md font-semibold text-gray-700">${group.title}</legend>
                     <p class="text-sm text-gray-500 mb-4">${group.description || ''}</p>`;
                 (group.parameters || []).forEach(param => {
-                    fieldsetHTML += window.componentRunManager.buildParameterInput(param); 
+                    fieldsetHTML += window.componentRunManager.buildParameterInput(param);
                 });
                 fieldset.innerHTML = fieldsetHTML;
                 parametersContainer.appendChild(fieldset);

@@ -76,6 +76,7 @@ export default class ComponentRunManager {
             
             document.getElementById('componentRunModal').classList.remove('hidden');
             
+            this._updateRunModalState();
             this.validateInputs();
 
         } catch (error) {
@@ -108,9 +109,11 @@ export default class ComponentRunManager {
                 const inputElement = document.getElementById(`input_${input.name.replace(/\s+/g, '_')}`);
                 inputElement.value = path;
                 inputElement.closest('.input-selector').classList.add('filled');
-                this.validateInputs();
+                
+                this._updateRunModalState(); // Update mutex state
+                this._updateDefaultOutputPath(); // Update the default output path hint
 
-                // Call the centralized helper function to handle all dependent UI updates.
+                this.validateInputs();
                 this._triggerDependentUpdates(input.name, path);
             }
         } catch (error) {
@@ -214,24 +217,40 @@ export default class ComponentRunManager {
     }
 
     buildParameterInput(param) {
-        const { name, label, type, help_text, default: defaultValue, dataSource, action } = param;
+        const { name, label, type, help_text, default: defaultValue, dataSource, action, validation_rules } = param;
         let controlHtml = '';
         const inputId = `param_${name}`;
 
-        // Use the user-friendly label, but include the technical name in a <code> tag for clarity
         const labelHtml = `<label for="${inputId}" class="block text-sm font-medium text-gray-700">${label || name} (<code class="text-xs">${name}</code>)</label>`;
         const helpHtml = help_text ? `<div class="parameter-help text-xs text-gray-500 mt-1">${help_text}</div>` : '';
         let actionButtonHtml = '';
 
-        // FIX #2: Create the "View Prompt" button if an action is defined
         if (action?.type === 'view_prompt') {
             actionButtonHtml = `<button type="button" class="btn-secondary-xs view-prompt-btn ml-2" data-param-name="${name}">View</button>`;
         }
 
-        // This switch statement handles all parameter types correctly
         switch (type) {
-            case 'bool':
+            case 'boolean':
                 controlHtml = `<div class="mt-1"><input type="checkbox" id="${inputId}" class="parameter-control rounded" ${defaultValue ? 'checked' : ''}></div>`;
+                break;
+
+            case 'file_path':
+            case 'dir_path':
+                const isDirectory = type === 'dir_path';
+                const extensions = validation_rules?.file_extensions || [];
+                controlHtml = `
+                    <div class="file-selector mt-1">
+                        <input type="text" id="${inputId}" class="parameter-control file-path-input" placeholder="${isDirectory ? 'Select directory...' : 'Select file...'}" value="${defaultValue || ''}">
+                        <button type="button"
+                                class="file-browse-btn param-browse-btn"
+                                data-param-name="${name}"
+                                data-is-directory="${isDirectory}"
+                                data-extensions="${extensions.join(',')}"
+                                >
+                            Browse
+                        </button>
+                    </div>
+                `;
                 break;
 
             case 'string_dropdown':
@@ -313,33 +332,45 @@ export default class ComponentRunManager {
             return;
         }
         
-        // Collect inputs
         const inputs = {};
         if (this.currentComponent.inputs) {
             this.currentComponent.inputs.forEach(input => {
                 const inputElement = document.getElementById(`input_${input.name.replace(/\s+/g, '_')}`);
-                inputs[input.name] = inputElement.value;
+                if (inputElement && inputElement.value) {
+                    inputs[input.name] = inputElement.value;
+                }
             });
         }
         
-        // Collect parameters
         const parameters = {};
-        const paramElements = document.querySelectorAll('[id^="param_"]');
+        const paramElements = document.querySelectorAll('.parameter-control');
+        let isTestMode = false;
         paramElements.forEach(element => {
             const paramName = element.id.replace('param_', '');
             let value = element.type === 'checkbox' ? element.checked : element.value;
             
-            // Handle list parameters
             if (element.type === 'text' && element.value.includes(',')) {
                 value = element.value.split(',').map(v => v.trim()).filter(v => v);
             }
             
+            if (paramName.startsWith('test') && value === true) {
+                isTestMode = true;
+            }
             parameters[paramName] = value;
         });
         
-        const outputDir = document.getElementById('outputDirPath').value;
+        const outputDirInput = document.getElementById('outputDirPath');
+        let outputDir = outputDirInput.value.trim();
+
+        if (!outputDir && outputDirInput.placeholder.startsWith('Defaults to: ')) {
+            outputDir = outputDirInput.placeholder.replace('Defaults to: ', '');
+        }
+
+        // *** Workaround: Provide a dummy output directory for test mode to satisfy API validation ***
+        if (isTestMode && !outputDir) {
+            outputDir = '/tmp/hdp_test_output'; // A placeholder path
+        }
         
-        // Start execution
         this.setRunningState(true);
         this.addLogMessage('info', 'Starting component execution...');
         
@@ -362,7 +393,6 @@ export default class ComponentRunManager {
             const result = await response.json();
             this.addLogMessage('success', `Component started successfully. Execution ID: ${result.execution_id}`);
             
-            // Start log streaming
             this.startLogStreaming(result.execution_id);
             
         } catch (error) {
@@ -548,23 +578,52 @@ export default class ComponentRunManager {
             if (startBtn) startBtn.disabled = true;
             return false;
         }
-        
-        // Check required inputs
+
+        // Check required inputs, considering mutual exclusion
         if (this.currentComponent.inputs) {
+            const validatedMutexGroups = new Set();
             this.currentComponent.inputs.forEach(input => {
-                if (input.required) {
-                    const inputElement = document.getElementById(`input_${input.name.replace(/\s+/g, '_')}`);
-                    if (!inputElement.value.trim()) {
-                        isValid = false;
+                if (validatedMutexGroups.has(input.name)) {
+                    return;
+                }
+
+                const inputElement = document.getElementById(`input_${input.name.replace(/\s+/g, '_')}`);
+                if (!inputElement.value.trim()) {
+                    if (input.required) {
+                        let hasFilledPartner = false;
+                        if (input.mutex_with && input.mutex_with.length > 0) {
+                            for (const mutexName of input.mutex_with) {
+                                const partnerElement = document.getElementById(`input_${mutexName.replace(/\s+/g, '_')}`);
+                                if (partnerElement && partnerElement.value.trim()) {
+                                    hasFilledPartner = true;
+                                    break;
+                                }
+                            }
+                            input.mutex_with.forEach(name => validatedMutexGroups.add(name));
+                            validatedMutexGroups.add(input.name);
+                        }
+                        
+                        if (!hasFilledPartner) {
+                            isValid = false;
+                        }
                     }
                 }
             });
         }
         
-        // Check output directory
-        const outputDir = document.getElementById('outputDirPath').value.trim();
-        if (!outputDir) {
+        // Check output directory, accounting for the default placeholder
+        const outputDirInput = document.getElementById('outputDirPath');
+        const hasValue = outputDirInput.value.trim() !== '';
+        const hasDefault = outputDirInput.placeholder.startsWith('Defaults to:');
+        
+        if (!hasValue && !hasDefault) {
             isValid = false;
+        }
+
+        // Final check: If a 'test' checkbox is checked, the form is always valid
+        const testCheckbox = document.querySelector(`input[type="checkbox"][id^="param_test"]`);
+        if (testCheckbox && testCheckbox.checked) {
+            isValid = true;
         }
         
         startBtn.disabled = !isValid;
@@ -857,6 +916,20 @@ export default class ComponentRunManager {
     }
 
     attachDynamicParameterListeners() {
+        // --- Centralized listener for all interactive elements in the run modal ---
+        const modal = document.getElementById('componentRunModal');
+        modal.addEventListener('input', (e) => {
+            // Update UI state for mutex rules whenever any input or parameter changes
+            this._updateRunModalState();
+        });
+        modal.addEventListener('change', (e) => {
+             // Handle changes for dropdowns and checkboxes
+            this._updateRunModalState();
+        });
+
+
+        // --- Specific listeners for special UI elements ---
+
         // Listener for the content viewer modal
         document.getElementById('closeContentViewerModal')?.addEventListener('click', 
             () => document.getElementById('contentViewerModal').classList.add('hidden'));
@@ -866,7 +939,9 @@ export default class ComponentRunManager {
             const sourceInfo = JSON.parse(el.dataset.source);
             if (sourceInfo.depends_on) {
                 const sourceDropdown = document.getElementById(`param_${sourceInfo.depends_on}`);
-                sourceDropdown.addEventListener('change', () => this.handlePromptIdChange(el, sourceDropdown.value));
+                if (sourceDropdown) {
+                    sourceDropdown.addEventListener('change', () => this.handlePromptIdChange(el, sourceDropdown.value));
+                }
             }
         });
 
@@ -1568,6 +1643,13 @@ export default class ComponentRunManager {
      * Attaches event listeners for special parameter widgets, like our new mapping button.
      */
     attachParameterWidgetListeners() {
+        // Generic listener for all parameter browse buttons
+        document.querySelectorAll('.param-browse-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                this.selectParameterFile(e.currentTarget);
+            });
+        });
+        
         document.querySelectorAll('.configure-column-mapping-btn').forEach(button => {
             button.addEventListener('click', (e) => {
                 const paramName = e.target.dataset.paramName;
@@ -1595,5 +1677,140 @@ export default class ComponentRunManager {
                 this.openSchemaMappingModal(paramName);
             });
         });
+    }
+
+    /**
+     * Centralized method to manage the enabled/disabled state of all inputs and parameters
+     * in the run modal based on mutual exclusion rules and special parameters like 'test'.
+     */
+    _updateRunModalState() {
+        const modal = document.getElementById('componentRunModal');
+        const allInteractiveElements = Array.from(modal.querySelectorAll('input, button, select, textarea'));
+        const allInputContainers = Array.from(modal.querySelectorAll('.input-selector'));
+        const allParamGroups = Array.from(modal.querySelectorAll('.parameter-group'));
+
+        // Rule 1: Check for an active "test" parameter
+        const testCheckbox = document.querySelector(`input[type="checkbox"][id^="param_test"]`);
+
+        if (testCheckbox && testCheckbox.checked) {
+            // Define elements that should NOT be disabled in test mode
+            const exemptElementIDs = [
+                'runTemplateSelector', 
+                'saveTemplateBtn', 
+                'importTemplateBtn', 
+                'exportTemplateBtn',
+                'closeComponentRun'
+            ];
+
+            // If test mode is active, disable everything except exempt elements
+            allInteractiveElements.forEach(el => {
+                // An element is exempt if it's the test checkbox itself or in our exempt list.
+                const isExempt = (el === testCheckbox) || exemptElementIDs.includes(el.id);
+                if (!isExempt) {
+                    el.disabled = true;
+                } else {
+                    el.disabled = false; // Explicitly enable exempt elements
+                }
+            });
+
+            allInputContainers.forEach(el => el.classList.add('disabled-visual'));
+            allParamGroups.forEach(el => el.classList.add('disabled-visual'));
+            
+            // Re-enable the test parameter's own container for visibility
+            testCheckbox.closest('.parameter-group')?.classList.remove('disabled-visual');
+            this.validateInputs();
+            return;
+        }
+
+        // If not in test mode, enable everything before applying mutex rules
+        allInteractiveElements.forEach(el => el.disabled = false);
+        allInputContainers.forEach(el => el.classList.remove('disabled-visual'));
+        allParamGroups.forEach(el => el.classList.remove('disabled-visual'));
+
+        // Rule 2: Handle mutually exclusive inputs
+        if (this.currentComponent?.inputs) {
+            const inputsWithValue = new Set();
+            this.currentComponent.inputs.forEach(input => {
+                const inputElement = document.getElementById(`input_${input.name.replace(/\s+/g, '_')}`);
+                if (inputElement && inputElement.value) {
+                    inputsWithValue.add(input.name);
+                }
+            });
+
+            this.currentComponent.inputs.forEach(input => {
+                const container = document.getElementById(`input_${input.name.replace(/\s+/g, '_')}`)?.closest('.input-selector');
+                if (!container) return;
+
+                let shouldBeDisabled = false;
+                // An input should be disabled if it has mutex partners AND any of those partners have a value.
+                if (input.mutex_with?.length > 0) {
+                    for (const mutexName of input.mutex_with) {
+                        if (inputsWithValue.has(mutexName)) {
+                            shouldBeDisabled = true;
+                            break;
+                        }
+                    }
+                }
+                
+                container.classList.toggle('disabled-visual', shouldBeDisabled);
+                container.querySelectorAll('input, button').forEach(el => el.disabled = shouldBeDisabled);
+            });
+        }
+        
+        this._updateDefaultOutputPath();
+        this.validateInputs();
+    }
+
+    /**
+     * Updates the output directory input field with a placeholder based on the
+     * currently selected input file or directory.
+     */
+    _updateDefaultOutputPath() {
+        const outputDirInput = document.getElementById('outputDirPath');
+        const inputFile = document.getElementById('input_input_file')?.value;
+        const inputDir = document.getElementById('input_input_dir')?.value;
+
+        let defaultPath = '';
+        if (inputFile) {
+            // Extracts the directory from a full file path
+            defaultPath = inputFile.substring(0, inputFile.lastIndexOf('/'));
+        } else if (inputDir) {
+            defaultPath = inputDir;
+        }
+
+        if (outputDirInput.value === '') {
+            outputDirInput.placeholder = defaultPath ? `Defaults to: ${defaultPath}` : 'Select output directory...';
+        }
+    }
+
+    /**
+     * Opens a file or directory selection dialog for a PARAMETER and updates the UI.
+     * @param {HTMLElement} browseBtn - The browse button that was clicked.
+     */
+    async selectParameterFile(browseBtn) {
+        const paramName = browseBtn.dataset.paramName;
+        const isDirectory = browseBtn.dataset.isDirectory === 'true';
+        const extensions = browseBtn.dataset.extensions ? browseBtn.dataset.extensions.split(',') : [];
+
+        try {
+            let path;
+            if (isDirectory) {
+                path = await window.electronAPI.openDirectory();
+            } else {
+                const filters = extensions.length > 0 ? [{ name: 'Supported Files', extensions: extensions.map(ext => ext.replace('.', '')) }] : [];
+                filters.push({ name: 'All Files', extensions: ['*'] });
+                path = await window.electronAPI.openFile({ title: `Select ${paramName}`, filters });
+            }
+
+            if (path) {
+                const inputElement = document.getElementById(`param_${paramName}`);
+                inputElement.value = path;
+                // Trigger an 'input' event to ensure validation and other listeners fire
+                inputElement.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        } catch (error) {
+            console.error(`Error selecting file/directory for parameter ${paramName}:`, error);
+            showToast(`Failed to select ${isDirectory ? 'directory' : 'file'}: ${error.message}`, 'error');
+        }
     }
 }

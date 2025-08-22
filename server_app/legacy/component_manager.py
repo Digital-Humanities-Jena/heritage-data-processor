@@ -291,34 +291,53 @@ class ComponentEnvironmentManager:
         return recommendations
 
     def _validate_component_structure(self, component_path: Path) -> bool:
-        """Validate that component has required files and structure"""
+        """Validate that component has required files and structure based on the new schema."""
         if not component_path.exists():
             logging.error(f"Component directory not found: {component_path}")
             return False
 
-        required_files = ["component.yaml", "main.py", "processor.py"]
-
-        for file_name in required_files:
-            file_path = component_path / file_name
-            if not file_path.exists():
-                logging.error(f"Missing required file: {file_path}")
-                return False
-
-        # Validate YAML structure
+        # 1. Validate component.yaml existence and structure
         try:
             yaml_file = component_path / "component.yaml"
+            if not yaml_file.exists():
+                logging.error(f"Missing required file: {yaml_file}")
+                return False
+
             with open(yaml_file, "r") as f:
                 config = yaml.safe_load(f)
 
-            required_yaml_fields = ["name", "label", "description", "inputs", "outputs"]
+            # Check for the top-level 'metadata' key
+            if "metadata" not in config:
+                logging.error("Missing required top-level key in component.yaml: metadata")
+                return False
+
+            metadata = config.get("metadata", {})
+            # Check for required fields within the 'metadata' block
+            required_yaml_fields = ["name", "label", "description"]
             for field in required_yaml_fields:
-                if field not in config:
-                    logging.error(f"Missing required YAML field: {field}")
+                if field not in metadata:
+                    logging.error(f"Missing required YAML field in metadata: {field}")
                     return False
 
         except Exception as e:
             logging.error(f"Invalid YAML configuration: {e}")
             return False
+
+        # 2. Validate required files from the 'structure' block
+        structure = config.get("structure", {})
+        # Fallback to default files if 'structure' block is missing, for safety
+        required_files_from_yaml = structure.get("required_files", ["main.py", "processor.py"])
+
+        for file_name in required_files_from_yaml:
+            # Skip wildcard patterns
+            if "*" in file_name:
+                continue
+
+            # Resolve path relative to the component directory
+            file_path = component_path / file_name
+            if not file_path.exists():
+                logging.error(f"Missing required file specified in structure: {file_path}")
+                return False
 
         return True
 

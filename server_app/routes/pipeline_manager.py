@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 # In a production app, the database path will come from the app config.
 PIPELINE_DB_PATH = Path("databases") / "pipeline_system.db"
+PIPELINE_DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 pipeline_db = PipelineDatabaseManager(PIPELINE_DB_PATH)
 
 
