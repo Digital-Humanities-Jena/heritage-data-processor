@@ -11,10 +11,13 @@ More information about this application will be provided soon.
 The modular **Pipeline Components** that form the core of this application's processing capabilities will be added in an upcoming commit. A comprehensive **Developer's Guide** for creating and modifying these components will follow.
 
 ### **Planned Updates for Upcoming Version (0.1.0-alpha.2)**
-* Publish basic **Pipeline Components** and implement Download/Update System
-* Modality Template for 3D Objects
+* New persistent Pipeline Component Download & Update System
 * Pipeline Component Developer's Guide
-* Cleanup and Enhance config.yaml
+* Publish basic **Pipeline Components**
+
+### **Planned Updates for Upcoming Version (0.1.0-alpha.3)**
+* Modality Template for 3D Objects (automated or manual associated files determination + material path validation & bundling)
+* Complex Pipeline Components (3D- and CUDA-related)
 
 ## 🚧 (Early) Alpha Stage Software
 This project is currently in its **Alpha phase**.
@@ -100,6 +103,17 @@ developer:
 ```
 
 Please be aware that enabling these features may lead to unexpected behavior or instability.
+
+
+# Known Bugs
+- [ ] Pipeline Constructor shows that the Zenodo Metadata was not set / mapped yet
+- [ ] Complex / Nested Metadata does not get forwarded within Uploads view or during Pipeline Execution
+- [ ] Error when Components are being uninstalled and installed again within same session
+- [ ] Tests within Component Execution Modal may fail if absolute paths are involved in the reference_data: modify those paths until a more intelligent solution is implemented.
+- [ ] Inconsistencies within Component Execution Templates
+- [ ] Output Directory in Component Execution Modal does not get set automatically in every case
+- [ ] Component Execution may construct wrong command which uses non-exclusive environment
+- [ ] "Clear" and "Download" button in Component Execution Modal not working
 
 
 # Disclaimer

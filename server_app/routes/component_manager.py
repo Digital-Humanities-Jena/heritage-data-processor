@@ -1,15 +1,20 @@
 # server_app/routes/component_manager.py
+from datetime import datetime
+import io
 import json
 import logging
-from datetime import datetime
+from packaging.version import parse as parse_version
 from pathlib import Path
 from queue import Queue
-import yaml
+import requests
+import shutil
 import sqlite3
 import threading
 import time
 from typing import Any, Dict
 import uuid
+import yaml
+import zipfile
 
 from flask import Blueprint, jsonify, request, Response
 
@@ -24,6 +29,7 @@ from ..legacy.component_manager import ComponentEnvironmentManager, ComponentIns
 
 from ..services.database import execute_db
 from ..services.project_manager import project_manager
+from ..utils.component_utils import scan_local_pipeline_components
 from ..utils.file_helpers import smart_copy_file
 
 component_manager_bp = Blueprint("component_manager_bp", __name__)
@@ -258,6 +264,296 @@ def get_pipeline_components():
     except Exception as e:
         logger.error(f"Error loading pipeline components: {e}", exc_info=True)
         return jsonify({"error": f"Failed to load components: {str(e)}"}), 500
+
+
+@component_manager_bp.route("/pipeline_components/health_check", methods=["POST"])
+def health_check_components():
+    """
+    Checks all 'installed' components. If a component's directory or its 'env'
+    subdirectory is missing, it automatically uninstalls it from the database.
+    """
+    manager = get_component_manager()
+    installed_components = manager.get_installed_components()
+    uninstalled_components = []
+
+    if not installed_components:
+        return jsonify({"success": True, "message": "No components were installed.", "cleaned_components": []})
+
+    for component in installed_components:
+        component_name = component.get("name")
+        component_path = Path(component.get("install_path", ""))
+        env_path = Path(component.get("env_path", ""))
+
+        should_uninstall = False
+        if not component_path.is_dir():
+            logger.warning(
+                f"Health Check: Component '{component_name}' is registered as installed, but its directory is missing. Uninstalling."
+            )
+            should_uninstall = True
+        elif not env_path.is_dir():
+            logger.warning(f"Health Check: Component '{component_name}' is missing its 'env' directory. Uninstalling.")
+            should_uninstall = True
+
+        if should_uninstall:
+            try:
+                # The uninstall_component function from component_installer handles the DB update
+                uninstall_success = uninstall_component(component_name, verbose=False)
+                if uninstall_success:
+                    uninstalled_components.append(component_name)
+                    logger.info(f"Successfully uninstalled inconsistent component '{component_name}'.")
+                else:
+                    logger.error(f"Failed to automatically uninstall inconsistent component '{component_name}'.")
+            except Exception as e:
+                logger.error(
+                    f"An error occurred during automatic uninstallation of '{component_name}': {e}", exc_info=True
+                )
+
+    if uninstalled_components:
+        message = f"Cleanup complete. Automatically uninstalled {len(uninstalled_components)} inconsistent component(s): {', '.join(uninstalled_components)}."
+    else:
+        message = "Component health check passed. No issues found."
+
+    return jsonify({"success": True, "message": message, "cleaned_components": uninstalled_components})
+
+
+@component_manager_bp.route("/pipeline_components/check_updates", methods=["GET"])
+def check_for_component_updates():
+    """
+    Compares local installed component versions against the remote component repository.
+    Includes a test mode to simulate an outdated component.
+    """
+    try:
+        # Check if test mode is requested
+        test_mode = request.args.get("test_mode", "false").lower() == "true"
+
+        discovery = get_component_discovery()
+        local_components = discovery.discover_local_components()
+        local_versions = {comp["name"]: comp["version"] for comp in local_components if comp["is_installed"]}
+
+        # --- TEST MODE INJECTION ---
+        if test_mode and "image_metadata_extractor" in local_versions:
+            logger.info("Update check running in TEST MODE.")
+            local_versions["image_metadata_extractor"] = "0.0.9"  # Pretend it's an old version
+
+        # Fetch the official remote component list
+        remote_api_url = "https://api.modavis.org/hdp/v1/available-components"
+        response = requests.get(remote_api_url, timeout=20)
+        response.raise_for_status()
+        remote_data = response.json()
+
+        updates_available = []
+
+        # Compare local installed versions with remote versions
+        for component_name, local_version_str in local_versions.items():
+            if component_name in remote_data and remote_data[component_name]:
+                # The remote data is a list; the first item is assumed to be the latest
+                remote_component = remote_data[component_name][0]
+                remote_version_str = remote_component.get("version")
+
+                if local_version_str and remote_version_str:
+                    local_version = parse_version(local_version_str)
+                    remote_version = parse_version(remote_version_str)
+
+                    if remote_version > local_version:
+                        if remote_version > local_version:
+                            updates_available.append(
+                                {
+                                    "name": component_name,
+                                    "label": remote_component.get("label", component_name),
+                                    "local_version": local_version_str,
+                                    "remote_version": remote_version_str,
+                                    "update_url": remote_component.get("record_url"),
+                                    "changelog_url": remote_component.get("file_links", {}).get("CHANGELOG.md"),
+                                    "file_links": remote_component.get("file_links", {}),  # Add this line
+                                }
+                            )
+
+        return jsonify({"success": True, "updates": updates_available})
+
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch remote component list: {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"Could not connect to the component repository: {e}"}), 502
+    except Exception as e:
+        logger.error(f"Error checking for component updates: {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+
+@component_manager_bp.route("/pipeline_components/changelog", methods=["GET"])
+def get_component_changelog():
+    """
+    Acts as a proxy to fetch changelog content from a URL to avoid CORS issues.
+    """
+    changelog_url = request.args.get("url")
+    if not changelog_url:
+        return jsonify({"success": False, "error": "A URL for the changelog must be provided."}), 400
+
+    try:
+        # Fetch the Markdown content from the provided URL
+        response = requests.get(changelog_url, timeout=15)
+        response.raise_for_status()
+        # Return the content directly with the correct MIME type
+        return Response(response.text, mimetype="text/markdown")
+
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch changelog from {changelog_url}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"Could not retrieve changelog content: {e}"}), 502
+
+
+@component_manager_bp.route("/pipeline_components/<component_name>/update", methods=["POST"])
+def update_component_route(component_name):
+    """
+    Downloads, extracts, and reinstalls a component to update it.
+    This process is non-destructive to user-added files (e.g., models).
+    """
+    data = request.get_json()
+    zip_url = data.get("zip_url")
+    if not zip_url:
+        return jsonify({"success": False, "error": "Missing 'zip_url' in request."}), 400
+
+    component_dir = COMPONENTS_DIR / component_name
+    if not component_dir.exists():
+        return jsonify({"success": False, "error": f"Component directory for '{component_name}' not found."}), 404
+
+    try:
+        # 1. Download the zip file content into memory
+        logger.info(f"Downloading update for '{component_name}' from {zip_url}")
+        response = requests.get(zip_url, timeout=90)
+        response.raise_for_status()
+        zip_content = io.BytesIO(response.content)
+
+        # 2. Extract the zip file, overwriting existing files
+        logger.info(f"Extracting update for '{component_name}' into {component_dir}")
+        with zipfile.ZipFile(zip_content, "r") as zip_ref:
+            zip_ref.extractall(component_dir)
+
+        # 3. Clean up the old environment
+        env_dir = component_dir / "env"
+        if env_dir.exists():
+            logger.info(f"Removing old environment for '{component_name}' at {env_dir}")
+            shutil.rmtree(env_dir)
+
+        # 4. Re-run the standard installation process to create a new environment
+        logger.info(f"Starting re-installation process for '{component_name}'")
+        installation_id = installation_service.start_installation(component_name, file_paths={})
+
+        # 5. Rescan local components to update the central JSON file
+        logger.info("Rescanning local components after update.")
+        scan_local_pipeline_components()
+
+        return (
+            jsonify(
+                {
+                    "success": True,
+                    "message": f"Update process for '{component_name}' initiated.",
+                    "installation_id": installation_id,  # Return this so the frontend can stream logs
+                }
+            ),
+            202,
+        )
+
+    except requests.RequestException as e:
+        logger.error(f"Failed to download component update for '{component_name}': {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"Download failed: {e}"}), 500
+    except Exception as e:
+        logger.error(f"An error occurred while updating component '{component_name}': {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"An unexpected error occurred: {e}"}), 500
+
+
+@component_manager_bp.route("/pipeline_components/remote", methods=["GET"])
+def get_remote_components():
+    """
+    Fetches the remote component list and filters out any components
+    that already exist locally, regardless of their installation status.
+    """
+    try:
+        discovery = get_component_discovery()
+        local_components = discovery.discover_local_components()
+        local_component_names = {comp["name"] for comp in local_components}
+
+        remote_api_url = "https://api.modavis.org/hdp/v1/available-components"
+        response = requests.get(remote_api_url, timeout=20)
+        response.raise_for_status()
+        remote_data = response.json()
+
+        downloadable_components = {}
+        for component_name, component_list in remote_data.items():
+            if component_name == "metadata":
+                continue
+
+            # If the component directory doesn't exist locally, it's available for download
+            if component_name not in local_component_names:
+                if component_list:
+                    # Assume the first item in the list is the latest version
+                    component_info = component_list[0]
+
+                    # --- Add the component identifier and changelog URL ---
+                    component_info["name"] = component_name
+                    component_info["changelog_url"] = component_info.get("file_links", {}).get("CHANGELOG.md")
+
+                    category = component_info.get("category", "General")
+                    if category not in downloadable_components:
+                        downloadable_components[category] = []
+                    downloadable_components[category].append(component_info)
+
+        return jsonify({"success": True, "components": downloadable_components})
+
+    except requests.RequestException as e:
+        logger.error(f"Failed to fetch remote component list: {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"Could not connect to the component repository: {e}"}), 502
+    except Exception as e:
+        logger.error(f"Error getting remote components: {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
+
+
+@component_manager_bp.route("/pipeline_components/download", methods=["POST"])
+def download_component_route():
+    """
+    Downloads a component zip file and extracts it into the pipeline_components directory.
+    Checks for existing directories to prevent overwriting.
+    """
+    data = request.get_json()
+    zip_url = data.get("zip_url")
+    component_name = data.get("component_name")
+
+    if not zip_url or not component_name:
+        return jsonify({"success": False, "error": "Missing 'zip_url' or 'component_name' in request."}), 400
+
+    component_dir = COMPONENTS_DIR / component_name
+
+    # Pre-check to ensure the directory does not already exist
+    if component_dir.exists():
+        return (
+            jsonify(
+                {
+                    "success": False,
+                    "error": f"Component directory '{component_name}' already exists. Please update it instead.",
+                }
+            ),
+            409,
+        )
+
+    try:
+        logger.info(f"Downloading new component '{component_name}' from {zip_url}")
+        response = requests.get(zip_url, timeout=90)
+        response.raise_for_status()
+        zip_content = io.BytesIO(response.content)
+
+        component_dir.mkdir(parents=True, exist_ok=False)
+
+        logger.info(f"Extracting new component '{component_name}' to {component_dir}")
+        with zipfile.ZipFile(zip_content, "r") as zip_ref:
+            zip_ref.extractall(component_dir)
+
+        return jsonify({"success": True, "message": f"Component '{component_name}' downloaded successfully."})
+
+    except FileExistsError:
+        return jsonify({"success": False, "error": f"Component directory '{component_name}' already exists."}), 409
+    except Exception as e:
+        logger.error(f"An error occurred while downloading component '{component_name}': {e}", exc_info=True)
+        # Clean up partial downloads
+        if component_dir.exists():
+            shutil.rmtree(component_dir)
+        return jsonify({"success": False, "error": f"An unexpected error occurred: {e}"}), 500
 
 
 @component_manager_bp.route("/pipeline_components/<component_name>/install", methods=["POST"])

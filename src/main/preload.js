@@ -25,5 +25,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onServerReady: (callback) => ipcRenderer.on('server-ready', callback),
   onSplashStatusUpdate: (callback) => ipcRenderer.on('splash-status-update', (_event, message) => callback(message)),
   setShowStartupDialog: (value) => ipcRenderer.send('set-show-startup-dialog', value),
-  onShowStartupInfo: (callback) => ipcRenderer.on('show-startup-info', (_event, data) => callback(data))
+  onShowStartupInfo: (callback) => ipcRenderer.on('show-startup-info', (_event, data) => callback(data)),
+  markdownToHtml: (markdown) => ipcRenderer.invoke('convert-markdown-to-html', markdown)
 });

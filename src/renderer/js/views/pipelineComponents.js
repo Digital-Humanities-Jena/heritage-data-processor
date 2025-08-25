@@ -1,5 +1,4 @@
 // js/views/pipelineComponents.js
-
 import { PYTHON_API_BASE_URL } from '../core/api.js';
 import { showToast } from '../core/ui.js';
 import { navigateToView } from '../core/navigation.js';
@@ -17,6 +16,23 @@ const optionsModalTitle = document.getElementById('optionsModalTitle');
 const optionsModalBody = document.getElementById('optionsModalBody');
 const closeOptionsModalFooterBtn = document.getElementById('closeOptionsModalFooterBtn');
 const saveComponentOptionsBtn = document.getElementById('saveComponentOptionsBtn');
+// ----- Update Components Modal
+const updateCheckModal = document.getElementById('updateCheckModal');
+const closeUpdateCheckModalBtn = document.getElementById('closeUpdateCheckModalBtn');
+const closeUpdateCheckModalFooterBtn = document.getElementById('closeUpdateCheckModalFooterBtn');
+const updateCheckModalBody = document.getElementById('updateCheckModalBody');
+// ----- Changelog of Component Modal
+const changelogModal = document.getElementById('componentChangelogModal');
+const closeChangelogBtn = document.getElementById('closeComponentChangelogBtn');
+const closeChangelogFooterBtn = document.getElementById('closeComponentChangelogFooterBtn');
+const changelogModalTitle = document.getElementById('componentChangelogModalTitle');
+const changelogModalBody = document.getElementById('componentChangelogModalBody');
+// ----- Download Components Modal
+const downloadComponentsModal = document.getElementById('downloadComponentsModal');
+const closeDownloadComponentsBtn = document.getElementById('closeDownloadComponentsBtn');
+const closeDownloadComponentsFooterBtn = document.getElementById('closeDownloadComponentsFooterBtn');
+const downloadableComponentsContainer = document.getElementById('downloadableComponentsContainer');
+
 
 // --- Constants & State ---
 let COMPONENT_API_BASE;
@@ -31,9 +47,23 @@ export async function loadAndDisplayPipelineComponents() {
     }
 
     if (!pipelineComponentsContainer) return;
-    pipelineComponentsContainer.innerHTML = '<p class="text-gray-500">Loading components...</p>';
+    pipelineComponentsContainer.innerHTML = '<p class="text-gray-500">Verifying component integrity...</p>';
 
     try {
+        // Step 1: Run the health check first to clean up any inconsistencies.
+        const healthResponse = await fetch(`${COMPONENT_API_BASE}/health_check`, { method: 'POST' });
+        const healthResult = await healthResponse.json();
+
+        if (!healthResponse.ok) {
+            // If the health check itself fails, show an error but still try to load the components.
+            showToast(`Component health check failed: ${healthResult.error || 'Unknown error'}`, 'error');
+        } else if (healthResult.cleaned_components && healthResult.cleaned_components.length > 0) {
+            // If components were cleaned up, notify the user.
+            showToast(healthResult.message, 'info', 5000);
+        }
+
+        // Step 2: Now, fetch and display the (potentially cleaned) list of components.
+        pipelineComponentsContainer.innerHTML = '<p class="text-gray-500">Loading components...</p>';
         const response = await fetch(COMPONENT_API_BASE);
         if (!response.ok) {
             throw new Error(`Failed to fetch pipeline components: ${response.statusText}`);
@@ -55,12 +85,18 @@ export async function loadAndDisplayPipelineComponents() {
                 <div class="text-center"><div class="font-semibold text-blue-600">${metadata.total_installed || 0}</div><div class="text-gray-600">Installed</div></div>
                 <div class="text-center"><div class="font-semibold text-green-600">${metadata.total_available || 0}</div><div class="text-gray-600">Available</div></div>
                 <div class="text-center"><div class="font-semibold text-purple-600">${categories.length}</div><div class="text-gray-600">Categories</div></div>
-                <div class="text-center"><button id="optimizeBtn" class="btn-secondary text-xs py-1 px-2">Optimize</button><div class="text-gray-600">Storage</div></div>
+                <div class="text-center">
+                    <button id="optimizeBtn" class="btn-secondary text-xs py-1 px-2">Optimize</button>
+                    <button id="updateCheckBtn" class="btn-secondary text-xs py-1 px-2 ml-1">Check for Updates</button>
+                    <button id="downloadNewBtn" class="btn-primary text-xs py-1 px-2 ml-1">Download Components</button>
+                </div>
             </div>
         `;
         pipelineComponentsContainer.appendChild(headerDiv);
         
         document.getElementById('optimizeBtn').addEventListener('click', optimizeComponents);
+        document.getElementById('updateCheckBtn').addEventListener('click', () => checkForUpdates(false));
+        document.getElementById('downloadNewBtn').addEventListener('click', showDownloadModal);
 
         const searchContainer = document.createElement('div');
         searchContainer.className = 'component-view-search-container';
@@ -77,13 +113,9 @@ export async function loadAndDisplayPipelineComponents() {
         const searchInput = document.getElementById('mainComponentSearchInput');
         searchInput.addEventListener('input', (e) => {
             const searchTerm = e.target.value.toLowerCase();
-            
-            // Iterate over each category section
             pipelineComponentsContainer.querySelectorAll('.collapsible-content').forEach(contentDiv => {
                 let visibleInCategory = 0;
                 const cards = contentDiv.querySelectorAll('.component-card');
-                
-                // Filter cards within the category
                 cards.forEach(card => {
                     const cardText = card.textContent.toLowerCase();
                     const isMatch = cardText.includes(searchTerm);
@@ -92,8 +124,6 @@ export async function loadAndDisplayPipelineComponents() {
                         visibleInCategory++;
                     }
                 });
-
-                // Hide the entire category header if no cards within it match
                 const header = contentDiv.previousElementSibling;
                 if (header && header.classList.contains('collapsible-header')) {
                     header.classList.toggle('hidden', visibleInCategory === 0);
@@ -101,11 +131,9 @@ export async function loadAndDisplayPipelineComponents() {
             });
         });
 
-        // Create component sections
         categories.forEach(category => {
             const components = componentsData[category];
             if (!components || components.length === 0) return;
-            
             const collapsibleId = `collapsible-${category.replace(/\s+/g, '-')}`;
             const header = document.createElement('div');
             header.className = 'collapsible-header';
@@ -116,21 +144,16 @@ export async function loadAndDisplayPipelineComponents() {
                     <span class="collapse-arrow transform transition-transform">▼</span>
                 </span>
             `;
-            
             const content = document.createElement('div');
             content.id = collapsibleId;
             content.className = 'collapsible-content grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4';
             content.style.display = 'none';
-
             components.forEach(component => {
                 const card = createComponentCard(component);
                 content.appendChild(card);
             });
-            
             pipelineComponentsContainer.appendChild(header);
             pipelineComponentsContainer.appendChild(content);
-
-            // Toggle functionality
             header.addEventListener('click', () => {
                 header.classList.toggle('active');
                 const icon = header.querySelector('.collapse-arrow');
@@ -616,6 +639,299 @@ async function optimizeComponents() {
     }
 }
 
+async function checkForUpdates(isTestMode = false) {
+    if (!updateCheckModal || !updateCheckModalBody) return;
+
+    updateCheckModalBody.innerHTML = '<p class="text-center text-gray-500">Checking for updates...</p>';
+    updateCheckModal.classList.remove('hidden');
+
+    try {
+        const apiUrl = isTestMode 
+            ? `${COMPONENT_API_BASE}/check_updates?test_mode=true` 
+            : `${COMPONENT_API_BASE}/check_updates`;
+        const response = await fetch(apiUrl);
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to check for updates.');
+        }
+
+        if (result.updates && result.updates.length > 0) {
+            let tableHtml = `
+                <p class="text-sm text-gray-600 mb-4">The following installed components have updates available:</p>
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="p-2 text-left font-semibold">Component</th>
+                            <th class="p-2 text-center font-semibold">Installed</th>
+                            <th class="p-2 text-center font-semibold">Latest</th>
+                            <th class="p-2 text-center font-semibold">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+            result.updates.forEach(update => {
+                const zipUrl = update.file_links ? update.file_links['component_complete.zip'] : null;
+                tableHtml += `
+                    <tr class="border-b">
+                        <td class="p-2">${update.label}</td>
+                        <td class="p-2 text-center font-mono text-red-600">${update.local_version}</td>
+                        <td class="p-2 text-center font-mono text-green-600">${update.remote_version}</td>
+                        <td class="p-2 text-center space-x-2">
+                            ${update.changelog_url 
+                                ? `<button class="view-changelog-btn btn-secondary text-xs py-1 px-2" data-url="${update.changelog_url}" data-label="${update.label}">View Changelog</button>`
+                                : ''
+                            }
+                            ${zipUrl
+                                ? `<button class="update-component-btn btn-primary text-xs py-1 px-2" data-name="${update.name}" data-zip-url="${zipUrl}">Update</button>`
+                                : `<span class="text-xs text-gray-400">Update N/A</span>`
+                            }
+                        </td>
+                    </tr>
+                `;
+            });
+            tableHtml += '</tbody></table>';
+            updateCheckModalBody.innerHTML = tableHtml;
+        } else {
+            updateCheckModalBody.innerHTML = '<p class="text-center text-green-600 font-semibold">All your components are up to date! 🎉</p>';
+        }
+
+    } catch (error) {
+        console.error("Error checking for component updates:", error);
+        updateCheckModalBody.innerHTML = `<p class="text-red-500 text-center">Error: ${error.message}</p>`;
+    }
+
+    updateCheckModalBody.addEventListener('click', (e) => {
+        const changelogBtn = e.target.closest('.view-changelog-btn');
+        if (changelogBtn) {
+            const url = changelogBtn.dataset.url;
+            const label = changelogBtn.dataset.label;
+            showChangelog(url, label);
+            return;
+        }
+
+        const updateBtn = e.target.closest('.update-component-btn');
+        if (updateBtn) {
+            const componentName = updateBtn.dataset.name;
+            const zipUrl = updateBtn.dataset.zipUrl;
+            if (confirm(`Are you sure you want to update '${componentName}'?\n\nThis will overwrite the existing component files.`)) {
+                updateComponent(componentName, zipUrl, updateBtn);
+            }
+        }
+    });
+}
+
+async function updateComponent(componentName, zipUrl) {
+    showToast(`Initiating update for ${componentName}...`, 'info');
+    // Close the update check modal, as the installation modal will now take over.
+    updateCheckModal.classList.add('hidden');
+    
+    // Show the installation modal in a "headless" state for the update
+    const installManager = window.componentInstallationManager;
+    installManager.showSimpleInstallModal(); // Use simple modal as no files are needed
+    document.getElementById('installModalTitle').textContent = `Updating ${componentName}`;
+    document.getElementById('componentInstallModal').classList.remove('hidden');
+    installManager.setInstallationState(true); // Manually set to "installing" state
+    installManager.updateInstallProgress(0, 'Starting update process...');
+
+    try {
+        const response = await fetch(`${COMPONENT_API_BASE}/${componentName}/update`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ zip_url: zipUrl })
+        });
+
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Update failed to start on the server.');
+        }
+
+        // The backend returns an installation_id to enable stream logs (like a normal install)
+        installManager.startLogStreaming(result.installation_id);
+
+    } catch (error) {
+        console.error(`Error updating component ${componentName}:`, error);
+        showToast(`Update failed: ${error.message}`, 'error');
+        // Use the installation manager to show the failure state
+        installManager.addInstallLog('error', `❌ Failed to start update: ${error.message}`);
+        installManager.setInstallationState(false, true); // Mark as complete with failure
+    }
+}
+
+async function showChangelog(url, componentLabel) {
+    if (!changelogModal || !changelogModalBody || !changelogModalTitle) {
+        console.error("Changelog modal elements not found!");
+        return;
+    }
+
+    changelogModalTitle.textContent = `Changelog for ${componentLabel}`;
+    changelogModalBody.innerHTML = '<p class="text-center text-gray-500">Loading changelog...</p>';
+    changelogModal.classList.remove('hidden');
+
+    try {
+        // Use the new backend proxy endpoint
+        const response = await fetch(`${PYTHON_API_BASE_URL}/api/pipeline_components/changelog?url=${encodeURIComponent(url)}`);
+        
+        if (!response.ok) {
+            const errorResult = await response.json();
+            throw new Error(errorResult.error || 'Failed to fetch changelog content.');
+        }
+
+        const markdownContent = await response.text();
+
+        const result = await window.electronAPI.markdownToHtml(markdownContent);
+        
+        if (result.success) {
+            changelogModalBody.innerHTML = result.html;
+        } else {
+            throw new Error(result.error || 'Markdown conversion failed in the main process.');
+        }
+
+    } catch (error) {
+        console.error("Error fetching or rendering changelog:", error);
+        changelogModalBody.innerHTML = `<p class="text-red-500 text-center">Error: ${error.message}</p>`;
+    }
+}
+
+async function showDownloadModal() {
+    if (!downloadComponentsModal || !downloadableComponentsContainer) return;
+
+    downloadableComponentsContainer.innerHTML = '<p class="text-center text-gray-500">Fetching available components...</p>';
+    downloadComponentsModal.classList.remove('hidden');
+
+    try {
+        const response = await fetch(`${COMPONENT_API_BASE}/remote`);
+        const result = await response.json();
+
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Failed to fetch component list.');
+        }
+        
+        const categories = Object.keys(result.components).sort();
+        
+        if (categories.length === 0) {
+            downloadableComponentsContainer.innerHTML = '<p class="text-center text-green-600 font-semibold">No new components available for download. Your local collection is complete!</p>';
+            return;
+        }
+
+        let contentHtml = '';
+        categories.forEach(category => {
+            contentHtml += `<h3 class="text-lg font-semibold text-gray-700 pt-2 border-t first:pt-0 first:border-t-0">${category}</h3>`;
+            result.components[category].forEach(component => {
+                const zipUrl = component.file_links ? component.file_links['component_complete.zip'] : null;
+                contentHtml += `
+                    <div class="component-download-card">
+                        <div>
+                            <h4 class="font-bold">${component.label} <span class="text-xs font-mono text-gray-500">${component.version}</span></h4>
+                            <p class="text-sm text-gray-600">${component.description}</p>
+                        </div>
+                        <div class="card-actions">
+                            ${component.changelog_url ? `<button class="view-changelog-btn btn-secondary" data-url="${component.changelog_url}" data-label="${component.label}">View Changelog</button>` : ''}
+                            ${zipUrl ? `<button class="download-component-btn btn-primary" data-name="${component.name}" data-zip-url="${zipUrl}" data-label="${component.label}">Download</button>` : ''}
+                        </div>
+                    </div>
+                `;
+            });
+        });
+
+        downloadableComponentsContainer.innerHTML = contentHtml;
+        
+        downloadableComponentsContainer.querySelectorAll('.download-component-btn').forEach(btn => {
+            btn.addEventListener('click', handleComponentDownload);
+        });
+        downloadableComponentsContainer.querySelectorAll('.view-changelog-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const url = e.currentTarget.dataset.url;
+                const label = e.currentTarget.dataset.label;
+                showChangelog(url, label);
+            });
+        });
+
+    } catch (error) {
+        console.error("Error fetching downloadable components:", error);
+        downloadableComponentsContainer.innerHTML = `<p class="text-red-500 text-center">Error: ${error.message}</p>`;
+    }
+}
+
+async function handleComponentDownload(event) {
+    const button = event.currentTarget;
+    const componentName = button.dataset.name;
+    const componentLabel = button.dataset.label;
+    const zipUrl = button.dataset.zipUrl;
+
+    const originalText = button.innerHTML;
+    button.innerHTML = 'Downloading...';
+    button.disabled = true;
+
+    try {
+        const response = await fetch(`${COMPONENT_API_BASE}/download`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ component_name: componentName, zip_url: zipUrl })
+        });
+
+        const result = await response.json();
+        if (!response.ok || !result.success) {
+            throw new Error(result.error || 'Download failed on the server.');
+        }
+
+        showToast(`'${componentLabel}' downloaded successfully!`, 'success');
+        button.innerHTML = '✅ Downloaded';
+        
+        if (confirm(`Component '${componentLabel}' has been downloaded.\n\nDo you want to open the installation window now?`)) {
+            downloadComponentsModal.classList.add('hidden');
+            await loadAndDisplayPipelineComponents();
+            
+            try {
+                // Use the robust waitForElement function to find the install button after the UI has re-rendered
+                const installButton = await waitForElement(`.component-card[data-component-name="${componentName}"] .install-btn`);
+                installButton.click();
+            } catch (error) {
+                console.error(error);
+                showToast("Could not automatically open installer. Please find the component in the list and click 'Install'.", "warning");
+            }
+
+        } else {
+            // If they cancel the install prompt, just refresh the main component list
+            await loadAndDisplayPipelineComponents();
+        }
+
+    } catch (error) {
+        console.error(`Error downloading component ${componentName}:`, error);
+        showToast(`Download failed: ${error.message}`, 'error');
+        button.innerHTML = originalText;
+        button.disabled = false;
+    }
+}
+
+
+/**
+ * Waits for a specified element to appear in the DOM.
+ * @param {string} selector The CSS selector of the element to wait for.
+ * @param {number} timeout The maximum time to wait in milliseconds.
+ * @returns {Promise<Element>} A promise that resolves with the element when found.
+ */
+function waitForElement(selector, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        const intervalTime = 100;
+        let elapsedTime = 0;
+        const interval = setInterval(() => {
+            const element = document.querySelector(selector);
+            if (element) {
+                clearInterval(interval);
+                resolve(element);
+            } else {
+                elapsedTime += intervalTime;
+                if (elapsedTime >= timeout) {
+                    clearInterval(interval);
+                    reject(new Error(`Element "${selector}" not found within ${timeout}ms.`));
+                }
+            }
+        }, intervalTime);
+    });
+}
+
 // --- Initialization ---
 export function initPipelineComponents() {
     COMPONENT_API_BASE = `${PYTHON_API_BASE_URL}/api/pipeline_components`;
@@ -634,6 +950,24 @@ export function initPipelineComponents() {
     }
     if (closeOptionsModalFooterBtn) {
         closeOptionsModalFooterBtn.addEventListener('click', () => optionsModal.classList.add('hidden'));
+    }
+    if (closeUpdateCheckModalBtn) {
+        closeUpdateCheckModalBtn.addEventListener('click', () => updateCheckModal.classList.add('hidden'));
+    }
+    if (closeUpdateCheckModalFooterBtn) {
+        closeUpdateCheckModalFooterBtn.addEventListener('click', () => updateCheckModal.classList.add('hidden'));
+    }
+    if (closeChangelogBtn) {
+        closeChangelogBtn.addEventListener('click', () => changelogModal.classList.add('hidden'));
+    }
+    if (closeChangelogFooterBtn) {
+        closeChangelogFooterBtn.addEventListener('click', () => changelogModal.classList.add('hidden'));
+    }
+    if (closeDownloadComponentsBtn) {
+        closeDownloadComponentsBtn.addEventListener('click', () => downloadComponentsModal.classList.add('hidden'));
+    }
+    if (closeDownloadComponentsFooterBtn) {
+        closeDownloadComponentsFooterBtn.addEventListener('click', () => downloadComponentsModal.classList.add('hidden'));
     }
 }
 

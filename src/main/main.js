@@ -554,6 +554,17 @@ ipcMain.handle('dialog:save-hdpc', async (event, options) => {
     return { canceled, filePath };
 });
 
+ipcMain.handle('convert-markdown-to-html', (event, markdown) => {
+  try {
+    const converter = new showdown.Converter();
+    const html = converter.makeHtml(markdown);
+    return { success: true, html: html };
+  } catch (error) {
+    console.error('Failed to convert Markdown:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 ipcMain.on('set-show-startup-dialog', (event, value) => {
   try {
     const configPath = path.join(app.getAppPath(), 'server_app', 'data', 'config.yaml');

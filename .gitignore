@@ -15,6 +15,10 @@ codebase.sh
 
 codebase/
 
+**/available_components.json
+**/component_versions.json
+**/zenodo_components.json
+
 # =======================================
 # Environment Specific
 # =======================================

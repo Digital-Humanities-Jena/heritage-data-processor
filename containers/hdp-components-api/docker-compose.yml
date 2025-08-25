@@ -1,0 +1,48 @@
+services:
+  hdp-components-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: hdp-components-api
+    ports:
+      - "8599:8599"
+    environment:
+      - PORT=8599
+      - HOST=0.0.0.0
+      - DEBUG=false
+      - API_KEY=${API_KEY}
+      - ZENODO_COMMUNITY_ID=hdp-components
+      - REQUEST_TIMEOUT=30
+      - ENABLE_SCHEDULER=true
+      - UPDATE_INTERVAL_HOURS=24
+      - INITIAL_UPDATE_ON_STARTUP=true
+    volumes:
+      - hdp_components_data:/app/data
+      - hdp_components_logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - hdp-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8599/hdp/v1/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "1.0"
+        reservations:
+          memory: 256M
+          cpus: "0.5"
+
+volumes:
+  hdp_components_data:
+    driver: local
+  hdp_components_logs:
+    driver: local
+
+networks:
+  hdp-network:
+    driver: bridge
