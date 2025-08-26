@@ -13,6 +13,9 @@ from typing import Dict, List, Set, Any, Optional
 import logging
 import shutil
 import os
+import tempfile
+
+from ..routes.component_runner_utils import get_executable_path, get_python_interpreter_path
 
 
 class SharedDependencyManager:
@@ -154,15 +157,16 @@ class SharedDependencyManager:
                 shutil.rmtree(self.base_env_path)
 
             if not self.base_env_path.exists():
-                logging.info("Creating shared base environment with uv...")
-                # Create base virtual environment using uv
+                logging.info("Creating shared base environment using bundled python...")
+                python_interpreter = get_python_interpreter_path()
+                command = [python_interpreter, "-m", "venv", str(self.base_env_path)]
                 subprocess.run(
-                    ["uv", "venv", str(self.base_env_path), "--python", "3.11"],
+                    command,
                     check=True,
                     capture_output=True,
                     text=True,
                 )
-                logging.info("Base uv virtual environment created successfully.")
+                logging.info("Base virtual environment created successfully.")
 
             # Get shared dependencies from the analysis
             analysis = self._load_dependency_analysis()
@@ -176,22 +180,27 @@ class SharedDependencyManager:
                 # Create a temporary shared requirements file
                 self._create_shared_requirements_file(analysis["shared_candidates"])
 
+                uv_executable = get_executable_path("uv")
                 # Install shared dependencies using uv pip
                 logging.info(f"Installing {len(shared_packages)} shared dependencies with uv...")
-                subprocess.run(
-                    [
-                        "uv",
-                        "pip",
-                        "install",
-                        "-r",
-                        str(self.shared_requirements_file),
-                        "--python",
-                        str(python_exe),
-                    ],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
+                with tempfile.TemporaryDirectory() as temp_dir:
+                    env = os.environ.copy()
+                    env["UV_CACHE_DIR"] = temp_dir
+                    subprocess.run(
+                        [
+                            uv_executable,
+                            "pip",
+                            "install",
+                            "-r",
+                            str(self.shared_requirements_file),
+                            "--python",
+                            str(python_exe),
+                        ],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                        env=env,
+                    )
 
                 self._update_shared_dependency_db(analysis["shared_candidates"])
                 self._verify_pip_installation(python_exe)  # You can keep this to verify pip's presence

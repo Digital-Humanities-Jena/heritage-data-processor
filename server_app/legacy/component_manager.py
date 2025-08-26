@@ -1,14 +1,19 @@
 # server_app/legacy/component_manager.py
-import os
-import subprocess
 import json
-from queue import Queue
-import sqlite3
-from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
-import yaml
 import logging
+import os
+from pathlib import Path
+from queue import Queue
+import shutil
+import sqlite3
+import subprocess
+import sys
+import tempfile
+from typing import Dict, List, Optional, Any, Tuple
+import venv
+import yaml
 
+from ..routes.component_runner_utils import get_executable_path, get_python_interpreter_path
 from .shared_dependency_manager import SharedDependencyManager
 
 
@@ -342,38 +347,54 @@ class ComponentEnvironmentManager:
         return True
 
     def _create_virtual_environment(self, env_path: Path):
-        """Create virtual environment using uv."""
+        """
+        Creates a virtual environment by spawning a clean subprocess with the
+        real internal Python interpreter. This is the definitive method to
+        avoid bootloader interference.
+        """
+        logging.info("Creating virtual environment in a clean subprocess...")
         try:
             if env_path.exists():
-                import shutil
-
+                logging.warning(f"Removing existing environment at {env_path}")
                 shutil.rmtree(env_path)
 
-            # Create the virtual environment using uv
-            subprocess.run(
-                ["uv", "venv", str(env_path), "--python", "3.11"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            logging.info(f"uv virtual environment created successfully at: {env_path}")
+            # 1. Discover the real, internal Python interpreter
+            real_python = get_real_python_interpreter()
+            logging.info(f"Using real internal interpreter: {real_python}")
 
-            # Verify the environment and get the Python executable path
-            python_exe = self._find_working_python_executable(env_path)
-            if not python_exe:
-                raise Exception("Failed to find Python executable in the new uv environment.")
+            # 2. Construct the command to create the venv
+            command = [
+                real_python,
+                "-m",
+                "venv",
+                str(env_path),
+                "--without-pip",  # Create without pip first to avoid issues
+            ]
+
+            # 3. Execute in a clean subprocess
+            subprocess.run(command, check=True, capture_output=True, text=True, timeout=30)
+            logging.info("Virtual environment structure created successfully.")
+
+            # 4. Install/Upgrade pip using the new environment's python
+            pip_command = [
+                str(env_path / "bin" / "python"),
+                "-m",
+                "ensurepip",
+                "--upgrade",
+            ]
+            subprocess.run(pip_command, check=True, capture_output=True, text=True, timeout=60)
+            logging.info("Pip installed successfully into the new environment.")
 
         except subprocess.CalledProcessError as e:
-            logging.error(f"Failed to create uv environment: {e.stderr}")
-            raise
+            error_message = (
+                f"A subprocess failed during venv creation. " f"Command: '{' '.join(e.cmd)}'. Error: {e.stderr}"
+            )
+            logging.error(error_message, exc_info=True)
+            raise ComponentInstallationError(message=error_message) from e
         except Exception as e:
-            logging.error(f"An unexpected error occurred while creating the uv environment: {e}")
-            # Clean up on failure
-            if env_path.exists():
-                import shutil
-
-                shutil.rmtree(env_path, ignore_errors=True)
-            raise
+            error_message = f"An unexpected error occurred during venv creation: {e}"
+            logging.error(error_message, exc_info=True)
+            raise ComponentInstallationError(message=error_message) from e
 
     def _configure_shared_environment_inheritance(self, env_path: Path):
         """Configure environment to inherit from shared base environment"""
@@ -443,8 +464,9 @@ class ComponentEnvironmentManager:
             return
 
         try:
+            uv_executable = get_executable_path("uv")
             command = [
-                "uv",
+                uv_executable,
                 "pip",
                 "install",
                 "-r",
@@ -453,33 +475,37 @@ class ComponentEnvironmentManager:
                 str(self._find_working_python_executable(env_path)),
             ]
 
-            process = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-            )
+            with tempfile.TemporaryDirectory() as temp_dir:
+                env = os.environ.copy()
+                env["UV_CACHE_DIR"] = temp_dir
+                process = subprocess.Popen(
+                    command,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    env=env,
+                )
 
-            progress = 45
-            if log_queue:
-                for line in iter(process.stdout.readline, ""):
-                    if line.strip():
-                        log_queue.put({"level": "stdout", "message": line.strip()})
-                        # Slowly increment progress during dependency installation
-                        if progress < 80:
-                            progress += 0.5
-                            log_queue.put({"progress": int(progress)})
+                progress = 45
+                if log_queue:
+                    for line in iter(process.stdout.readline, ""):
+                        if line.strip():
+                            log_queue.put({"level": "stdout", "message": line.strip()})
+                            # Slowly increment progress during dependency installation
+                            if progress < 80:
+                                progress += 0.5
+                                log_queue.put({"progress": int(progress)})
 
-            process.wait()
+                process.wait()
 
-            if process.returncode != 0:
-                raise Exception(f"uv pip install failed with exit code {process.returncode}")
+                if process.returncode != 0:
+                    raise Exception(f"uv pip install failed with exit code {process.returncode}")
 
-            if log_queue:
-                log_queue.put({"progress": 80})
-            logging.info(f"Dependencies from {requirements_file} installed successfully.")
+                if log_queue:
+                    log_queue.put({"progress": 80})
+                logging.info(f"Dependencies from {requirements_file} installed successfully.")
 
         except Exception as e:
             logging.error(f"An unexpected error occurred during dependency installation: {e}")
@@ -783,3 +809,60 @@ class ComponentEnvironmentManager:
         except Exception as e:
             logging.error(f"Virtual environment validation failed: {e}")
             return False
+
+
+def get_real_python_interpreter() -> str:
+    """
+    Executes the bypass in run.py to get the path to the real, internal
+    Python interpreter, not the PyInstaller bootloader.
+    """
+    if not getattr(sys, "frozen", False):
+        return sys.executable
+
+    # Use a unique env var to avoid conflicts
+    env = os.environ.copy()
+    env["HDP_INTERPRETER_PATH_REQUEST"] = "1"
+    try:
+        # sys.executable is the bootloader; we run it to trigger the bypass
+        result = subprocess.run(
+            [sys.executable],
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=5,  # Add a timeout for safety
+        )
+        interpreter_path = result.stdout.strip()
+        if not Path(interpreter_path).exists():
+            raise FileNotFoundError(f"Bypass returned non-existent path: {interpreter_path}")
+        return interpreter_path
+    except subprocess.CalledProcessError as e:
+        raise RuntimeError(f"Failed to get real interpreter path via bypass. Error: {e.stderr}") from e
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Timeout expired while trying to get real interpreter path.")
+
+
+class CustomEnvBuilder(venv.EnvBuilder):
+    """
+    A custom environment builder that ensures the correct internal Python
+    interpreter is used to create the virtual environment, not the bootloader.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self.real_python_executable = kwargs.pop("real_python_executable", None)
+        super().__init__(*args, **kwargs)
+
+    def post_setup(self, context):
+        """
+        Overrides the post-setup to ensure the symlink to the Python executable
+        in the new venv points to the REAL internal interpreter.
+        """
+        super().post_setup(context)
+        # On non-Windows, the 'python' executable in the venv is a symlink.
+        # We need to forcefully overwrite it to point to our real interpreter
+        # instead of the bootloader (sys.executable).
+        if sys.platform != "win32" and self.real_python_executable:
+            symlink_path = Path(context.bin_path) / "python"
+            if symlink_path.exists():
+                symlink_path.unlink()
+            os.symlink(self.real_python_executable, symlink_path)

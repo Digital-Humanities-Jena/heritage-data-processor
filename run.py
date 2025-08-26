@@ -7,23 +7,36 @@ import sys
 
 
 def get_default_config_path():
-    """Get the default config path, handling both development and packaged modes."""
-
+    """Get the default config path, handling Electron + PyInstaller structure."""
     if hasattr(sys, "_MEIPASS"):
-        # = PyInstaller Bundle Mode
-        # In packaged mode, config should be in the external resources
+        # PyInstaller bundle mode
         if os.environ.get("ELECTRON_RESOURCES_PATH"):
-            # Electron sets this environment variable pointing to resources
             return os.path.join(os.environ["ELECTRON_RESOURCES_PATH"], "data", "config.yaml")
         else:
-            bundle_dir = Path(sys.executable).parent
-            return str(bundle_dir.parent / "data" / "config.yaml")
+            # sys.executable = .../python_backend/HDPBackend
+            backend_dir = Path(sys.executable).parent
+            resources_dir = backend_dir.parent  # Should be Resources/
+            return str(resources_dir / "data" / "config.yaml")
     else:
-        # = Development mode
+        # Development mode
         return str(Path(__file__).resolve().parent / "server_app" / "data" / "config.yaml")
 
 
 if __name__ == "__main__":
+    # This is a simple bypass. It handles the special case where the app is
+    # launched by another process to find the real internal Python interpreter path.
+    if os.environ.get("HDP_INTERPRETER_PATH_REQUEST") == "1":
+        if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
+            # sys._MEIPASS is the path to the '_internal' directory
+            internal_path = Path(sys._MEIPASS)
+            py_executable = internal_path / "python"
+            if py_executable.exists():
+                print(py_executable.resolve())
+                sys.exit(0)
+        # Fallback for development or if the path isn't found
+        print(sys.executable)
+        sys.exit(0)
+
     DEFAULT_CONFIG_PATH = get_default_config_path()
     print(DEFAULT_CONFIG_PATH)
 
