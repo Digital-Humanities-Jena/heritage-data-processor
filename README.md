@@ -10,14 +10,14 @@ More information about this application will be provided soon.
 #### **Pipeline Components**
 The modular **Pipeline Components** that form the core of this application's processing capabilities will be added in an upcoming commit. A comprehensive **Developer's Guide** for creating and modifying these components will follow.
 
-### **Planned Updates for Upcoming Version (0.1.0-alpha.2)**
-* New persistent Pipeline Component Download & Update System
-* Pipeline Component Developer's Guide
-* Publish basic **Pipeline Components**
-
 ### **Planned Updates for Upcoming Version (0.1.0-alpha.3)**
 * Modality Template for 3D Objects (automated or manual associated files determination + material path validation & bundling)
 * Complex Pipeline Components (3D- and CUDA-related)
+
+
+**Known Bugs** and some missing features are listed in the [Backlog](./BACKLOG.md) (incomplete).
+
+
 
 ## 🚧 (Early) Alpha Stage Software
 This project is currently in its **Alpha phase**.
@@ -34,9 +34,9 @@ Bug reports, feedback, and contributions to help us reach a stable Beta and fina
 ## Getting Started
 
 ### **Downloads & Releases**
-You can find the latest release binary for macOS in the Releases section of this repository.
+You will be able to find the latest release binary for macOS, Windows and Linux in the Releases section of this repository after some testing is done around *v0.1.0-alpha.3*.
 
-Please note that the current macOS binary has undergone limited testing on one other machine. Binaries for other platforms (Windows, Linux) will be tested and uploaded in the near future.
+Please note that those binaries have undergone limited testing on one other machines.
 
 #### **macOS Installation**
 If you are using macOS, you will probably need to remove the quarantine attribute from the application after downloading it. To do so, open the Terminal and e.g. run the following command:
@@ -45,7 +45,7 @@ If you are using macOS, you will probably need to remove the quarantine attribut
 xattr -d com.apple.quarantine /path/to/Heritage\ Data\ Processor.app
 ```
 
-### Developer Installation & Setup
+### Developer Installation & Setup (recommended for now)
 If you wish to run the application from the source code, you will need to set up both a Python and a Node.js environment.
 
 #### Python Environment (uv)
@@ -103,17 +103,6 @@ developer:
 ```
 
 Please be aware that enabling these features may lead to unexpected behavior or instability.
-
-
-# Known Bugs
-- [ ] Pipeline Constructor shows that the Zenodo Metadata was not set / mapped yet
-- [ ] Complex / Nested Metadata does not get forwarded within Uploads view or during Pipeline Execution
-- [ ] Error when Components are being uninstalled and installed again within same session
-- [ ] Tests within Component Execution Modal may fail if absolute paths are involved in the reference_data: modify those paths until a more intelligent solution is implemented.
-- [ ] Inconsistencies within Component Execution Templates
-- [ ] Output Directory in Component Execution Modal does not get set automatically in every case
-- [ ] Component Execution may construct wrong command which uses non-exclusive environment
-- [ ] "Clear" and "Download" button in Component Execution Modal not working
 
 
 # Disclaimer
