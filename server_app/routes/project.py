@@ -9,6 +9,8 @@ import traceback
 
 from ..utils.decorators import project_required
 from ..utils.file_helpers import calculate_file_hash, get_file_mime_type
+from ..utils.model_file_scanner import find_associated_files
+from ..utils.file_validator import FileValidator
 from ..services.project_manager import project_manager
 from ..services.database import get_db_connection, query_db, load_project_config_value, execute_db
 from .zenodo import _extract_and_prepare_metadata
@@ -40,14 +42,22 @@ def load_hdpc_db():
         return jsonify({"error": "Path not provided"}), 400
 
     if project_manager.load_project(path_from_request):
-        # Query project name for a better user experience
-        project_info = query_db(project_manager.db_path, "SELECT project_name FROM project_info LIMIT 1;")
-        project_name = project_info[0]["project_name"] if project_info else "Unknown Project"
+        project_info = query_db(project_manager.db_path, "SELECT project_id, project_name FROM project_info LIMIT 1;")
+
+        if project_info:
+            project_id = project_info[0]["project_id"]
+            project_name = project_info[0]["project_name"]
+        else:
+            # Fallback in case the project_info table is empty
+            project_id = None
+            project_name = "Unknown Project"
+
         return (
             jsonify(
                 {
                     "message": "HDPC loaded successfully",
                     "project_name": project_name,
+                    "project_id": project_id,
                 }
             ),
             200,
@@ -88,144 +98,224 @@ def get_project_details_with_modality_route():
     return jsonify(project_details), 200
 
 
-@project_bp.route("/project/create_initial", methods=["POST"])
-def route_project_create_initial():
+@project_bp.route("/project/create_and_scan", methods=["POST"])
+def create_and_scan_project_route():
+    """
+    Handles the entire new project creation process: creates the .hdpc file,
+    saves all initial configuration, performs a hierarchical file scan, validates
+    each file, and determines its status.
+    """
     data = request.get_json()
     project_name = data.get("projectName")
     short_code = data.get("shortCode")
     hdpc_path_str = data.get("hdpcPath")
     modality = data.get("modality")
+    scan_options = data.get("scanOptions")
+    data_in_path_str = data.get("dataInPath")
+    data_out_path_str = data.get("dataOutPath")
+    batch_entity = data.get("batchEntity")
 
-    if not all([project_name, short_code, hdpc_path_str, modality]):
-        return jsonify({"success": False, "error": "Missing required project details."}), 400
+    # 1. Validate incoming data
+    if not all(
+        [
+            project_name,
+            short_code,
+            hdpc_path_str,
+            modality,
+            scan_options,
+            data_in_path_str,
+            data_out_path_str,
+            batch_entity,
+        ]
+    ):
+        return jsonify({"success": False, "error": "Missing required project data for creation."}), 400
 
     hdpc_path = Path(hdpc_path_str)
-    # The schema path needs to be resolved relative to the main config file
-    config_dir = Path(current_app.config["CONFIG_FILE_PATH"]).parent
-    schema_path = config_dir / "hdpc_schema.yaml"
+    data_in_path = Path(data_in_path_str).resolve()
+
+    if not data_in_path.is_dir():
+        return (
+            jsonify({"success": False, "error": f"The specified Input Data Directory does not exist: {data_in_path}"}),
+            400,
+        )
 
     if hdpc_path.exists():
         hdpc_path.unlink()
 
-    schema_created, schema_version = create_hdpc_database(hdpc_path, schema_path=schema_path)
+    # 2. Create the database from the schema file
+    config_dir = Path(current_app.config["CONFIG_FILE_PATH"]).parent
+    schema_path = config_dir / "hdpc_schema.yaml"
+    schema_created, schema_version = create_hdpc_database(hdpc_path, schema_path)
     if not schema_created:
-        return jsonify({"success": False, "error": "Failed to create database schema."}), 500
+        return jsonify({"success": False, "error": "Failed to create the HDPC database schema from YAML."}), 500
 
+    validator = FileValidator()
     conn = None
     try:
+        # 3. Use a SINGLE connection for all subsequent operations
         conn = sqlite3.connect(hdpc_path)
         cursor = conn.cursor()
+        cursor.execute("BEGIN TRANSACTION;")
+
         current_time_iso = datetime.now(timezone.utc).isoformat()
         cursor.execute(
             "INSERT INTO project_info (project_name, project_short_code, hdpc_schema_version, creation_timestamp, last_modified_timestamp) VALUES (?, ?, ?, ?, ?)",
             (project_name, short_code, schema_version, current_time_iso, current_time_iso),
         )
-        conn.commit()
         project_id = cursor.lastrowid
 
-        # Save modality
-        _save_project_config_value(hdpc_path, project_id, "core.modality", modality, "Modality Template")
+        config_values = [
+            (project_id, "core.modality", modality, "Modality Template"),
+            (project_id, "paths.data_in", str(data_in_path.resolve()), "Input data directory"),
+            (project_id, "paths.data_out", str(Path(data_out_path_str).resolve()), "Output data directory"),
+            (project_id, "core.batch_entity", batch_entity, "File processing mode"),
+        ]
+        cursor.executemany(
+            "INSERT INTO project_configuration (project_id, config_key, config_value, description) VALUES (?, ?, ?, ?)",
+            config_values,
+        )
+        cursor.execute(
+            "INSERT INTO file_scan_settings (project_id, modality, scan_options) VALUES (?, ?, ?)",
+            (project_id, modality, json.dumps(scan_options)),
+        )
 
+        # 4. Scan for files, validate, and prepare for response and DB insert
+        files_added_count = 0
+        extensions_to_scan = scan_options.get("extensions", [])
+        found_files_for_response = []
+        processed_paths = set()
+
+        if extensions_to_scan:
+            for file_p in data_in_path.rglob("*"):
+                if not file_p.is_file() or str(file_p.resolve()) in processed_paths:
+                    continue
+
+                if any(file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan):
+                    if file_p.name.lower().endswith(".obj") and scan_options.get("obj_options", {}).get("add_mtl"):
+                        file_structure = find_associated_files(file_p, scan_options)
+                    else:
+                        file_structure = {
+                            "name": file_p.name,
+                            "path": str(file_p.resolve()),
+                            "type": "source",
+                            "children": [],
+                        }
+
+                    # Validate every file in the hierarchy and set its status
+                    def validate_and_set_status(file_node):
+                        node_path = Path(file_node["path"])
+                        validation_report = validator.validate(node_path)
+                        file_node["validation_report"] = validation_report
+
+                        is_invalid = not validation_report["is_valid"]
+                        mtl_missing = False
+                        textures_missing = False
+                        has_conflicts = False
+                        obj_options = scan_options.get("obj_options", {})
+
+                        # Check for missing MTL (primary child) for source OBJ files
+                        if (
+                            file_node["type"] == "source"
+                            and node_path.name.lower().endswith(".obj")
+                            and obj_options.get("add_mtl")
+                        ):
+                            if not any(child["type"] == "primary" for child in file_node["children"]):
+                                mtl_missing = True
+                                validation_report["errors"].insert(
+                                    0, "File Warning: The referenced MTL file was not found in the same directory."
+                                )
+
+                        if file_node["type"] == "primary" and obj_options.get("add_textures"):
+                            missing_textures_list = file_node.get("missing_textures", [])
+                            if missing_textures_list:
+                                textures_missing = True
+                                validation_report["missing_textures"] = missing_textures_list
+                                error_msg = f"File Warning: Found {len(file_node['children'])} of {len(file_node['children']) + len(missing_textures_list)} referenced texture files."
+                                validation_report["errors"].insert(0, error_msg)
+
+                            conflicts_list = file_node.get("conflicts", [])
+                            if conflicts_list:
+                                has_conflicts = True
+                                validation_report["conflicts"] = conflicts_list
+                                error_msg = "File Conflict: Could not resolve texture paths due to multiple non-identical files being found."
+                                validation_report["errors"].insert(0, error_msg)
+
+                        # Set final status based on priority
+                        if has_conflicts:
+                            file_node["status"] = "File Conflict"
+                        elif is_invalid and (mtl_missing or textures_missing):
+                            file_node["status"] = "Problems"
+                        elif is_invalid:
+                            file_node["status"] = "Invalid"
+                        elif mtl_missing:
+                            file_node["status"] = "MTL Missing"
+                        elif textures_missing:
+                            file_node["status"] = "Textures Missing"
+                        else:
+                            file_node["status"] = "Valid"
+
+                        # Recurse
+                        for child in file_node.get("children", []):
+                            validate_and_set_status(child)
+
+                    validate_and_set_status(file_structure)
+                    found_files_for_response.append(file_structure)
+
+                    def insert_files_recursively(file_node, parent_id=None):
+                        nonlocal files_added_count
+                        node_path = Path(file_node["path"])
+                        abs_path_str = str(node_path.resolve())
+                        if abs_path_str in processed_paths:
+                            return
+
+                        rel_path_str = str(node_path.relative_to(data_in_path))
+                        cursor.execute(
+                            "INSERT INTO source_files (project_id, absolute_path, relative_path, filename, size_bytes, sha256_hash, mime_type, file_type, status, added_timestamp, parent_file_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                            (
+                                project_id,
+                                abs_path_str,
+                                rel_path_str,
+                                node_path.name,
+                                node_path.stat().st_size,
+                                calculate_file_hash(node_path),
+                                get_file_mime_type(node_path),
+                                file_node["type"],
+                                file_node["status"],
+                                datetime.now(timezone.utc).isoformat(),
+                                parent_id,
+                            ),
+                        )
+                        files_added_count += 1
+                        processed_paths.add(abs_path_str)
+                        new_parent_id = cursor.lastrowid
+                        for child_node in file_node.get("children", []):
+                            insert_files_recursively(child_node, new_parent_id)
+
+                    insert_files_recursively(file_structure)
+
+        conn.commit()
         return (
             jsonify(
                 {
                     "success": True,
-                    "message": "Project initialized.",
-                    "hdpcPath": str(hdpc_path),
+                    "message": f"Project created and {files_added_count} files scanned.",
                     "projectId": project_id,
-                    "projectName": project_name,
-                    "shortCode": short_code,
+                    "filesAdded": files_added_count,
+                    "foundFiles": found_files_for_response,
                 }
             ),
-            200,
+            201,
         )
-    except sqlite3.Error as e:
-        return jsonify({"success": False, "error": f"DB error during initial setup: {e}"}), 500
+
+    except Exception as e:
+        if conn:
+            conn.rollback()
+        if hdpc_path.exists():
+            hdpc_path.unlink()
+        return jsonify({"success": False, "error": f"An unexpected error occurred during project creation: {e}"}), 500
     finally:
         if conn:
             conn.close()
-
-
-@project_bp.route("/project/set_paths_and_scan", methods=["POST"])
-def route_project_set_paths_and_scan():
-    data = request.get_json()
-    hdpc_path_str = data.get("hdpcPath")
-    project_id = data.get("projectId")
-    data_in_path_str = data.get("dataInPath")
-    data_out_path_str = data.get("dataOutPath")
-    batch_entity = data.get("batchEntity")
-
-    if not all([hdpc_path_str, project_id, data_in_path_str, data_out_path_str, batch_entity]):
-        return jsonify({"success": False, "error": "Missing required path or project ID details."}), 400
-
-    hdpc_path = Path(hdpc_path_str)
-    data_in_path = Path(data_in_path_str).resolve()
-    if not data_in_path.is_dir():
-        return jsonify({"success": False, "error": "Input path is not a directory."}), 400
-
-    try:
-        _save_project_config_value(
-            hdpc_path, project_id, "paths.data_in", str(data_in_path.resolve()), "Input data directory"
-        )
-        _save_project_config_value(
-            hdpc_path, project_id, "paths.data_out", str(Path(data_out_path_str).resolve()), "Output data directory"
-        )
-        _save_project_config_value(hdpc_path, project_id, "core.batch_entity", batch_entity, "File processing mode")
-    except Exception as e:
-        return jsonify({"success": False, "error": f"Error saving path configurations: {e}"}), 500
-
-    files_added_count = 0
-    files_skipped_count = 0
-    from ..utils.file_helpers import calculate_file_hash, get_file_mime_type
-
-    try:
-        conn = sqlite3.connect(hdpc_path)
-        cursor = conn.cursor()
-        for file_p in data_in_path.rglob("*"):
-            if not file_p.is_file():
-                continue
-            abs_path_str = str(file_p.resolve())
-            cursor.execute(
-                "SELECT file_id FROM source_files WHERE project_id = ? AND absolute_path = ?",
-                (project_id, abs_path_str),
-            )
-            if cursor.fetchone():
-                files_skipped_count += 1
-                continue
-
-            rel_path_str = str(file_p.relative_to(data_in_path)) if data_in_path in file_p.parents else file_p.name
-            cursor.execute(
-                "INSERT INTO source_files (project_id, absolute_path, relative_path, filename, size_bytes, sha256_hash, mime_type, file_type, status, added_timestamp) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                (
-                    project_id,
-                    abs_path_str,
-                    rel_path_str,
-                    file_p.name,
-                    file_p.stat().st_size,
-                    calculate_file_hash(file_p),
-                    get_file_mime_type(file_p),
-                    "source",
-                    "pending",
-                    datetime.now(timezone.utc).isoformat(),
-                ),
-            )
-            files_added_count += 1
-        conn.commit()
-        conn.close()
-    except Exception as e:
-        return jsonify({"success": False, "error": f"Error during automatic file scanning: {e}"}), 500
-
-    return (
-        jsonify(
-            {
-                "success": True,
-                "message": "Paths configured and files scanned.",
-                "filesAdded": files_added_count,
-                "filesSkipped": files_skipped_count,
-            }
-        ),
-        200,
-    )
 
 
 @project_bp.route("/project/uploads_tab_counts", methods=["GET"])
@@ -241,7 +331,7 @@ def get_uploads_tab_counts_route():
         cursor = conn.cursor()
         project_id = cursor.execute("SELECT project_id FROM project_info LIMIT 1").fetchone()["project_id"]
 
-        prep_query = """SELECT COUNT(*) FROM source_files sf LEFT JOIN zenodo_records zr ON sf.file_id = zr.source_file_id WHERE sf.project_id = ? AND sf.status IN ('pending', 'source_added', 'metadata_error', 'verified') AND (zr.record_id IS NULL OR zr.record_status IN ('preparation_failed', 'discarded'))"""
+        prep_query = """SELECT COUNT(*) FROM source_files sf LEFT JOIN zenodo_records zr ON sf.file_id = zr.source_file_id WHERE sf.project_id = ? AND sf.status IN ('pending', 'source_added', 'metadata_error', 'verified', 'Valid', 'Invalid', 'Problems', 'MTL Missing', 'Textures Missing', 'File Conflict') AND (zr.record_id IS NULL OR zr.record_status IN ('preparation_failed', 'discarded'))"""
         counts["pending_preparation"] = cursor.execute(prep_query, (project_id,)).fetchone()[0]
 
         ops_query = """SELECT COUNT(*) FROM zenodo_records WHERE project_id = ? AND record_status = 'prepared' AND zenodo_record_id IS NULL AND is_sandbox = ?"""
@@ -444,6 +534,9 @@ def add_source_files_route():
                     continue
 
                 # If the file is truly new, insert it.
+                file_type = "derived" if record_id_to_associate else "source"
+                status = "pending_upload" if record_id_to_associate else "pending"
+
                 params = (
                     project_id,
                     str(file_path),
@@ -452,8 +545,8 @@ def add_source_files_route():
                     file_path.stat().st_size,
                     current_file_hash,
                     get_file_mime_type(file_path),
-                    "derived",
-                    "pending_upload",
+                    file_type,
+                    status,
                     datetime.now(timezone.utc).isoformat(),
                     pipeline_name,
                     step_name,

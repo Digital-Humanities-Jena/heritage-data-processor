@@ -10,9 +10,9 @@ More information about this application will be provided soon.
 #### **Pipeline Components**
 The modular **Pipeline Components** that form the core of this application's processing capabilities will be added in an upcoming commit. A comprehensive **Developer's Guide** for creating and modifying these components will follow.
 
-### **Planned Updates for Upcoming Version (0.1.0-alpha.3)**
-* Modality Template for 3D Objects (automated or manual associated files determination + material path validation & bundling)
+### **Planned Updates for Upcoming Version (0.1.0-alpha.4)**
 * Complex Pipeline Components (3D- and CUDA-related)
+* Essential bugfixes during Metadata forwarding
 
 
 **Known Bugs** and some missing features are listed in the [Backlog](./BACKLOG.md) (incomplete).

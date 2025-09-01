@@ -1012,11 +1012,11 @@ def get_uploads_by_tab_route():
                 "where": "sf.project_id = ? AND sf.status IN ('pending', 'source_added', 'metadata_error', 'verified') AND (zr.record_id IS NULL OR zr.record_status IN ('preparation_failed', 'discarded'))",
                 "order": "ORDER BY sf.filename ASC",
             },
-            "pending_operations": {
-                "select": "SELECT zr.record_id AS local_record_db_id, zr.record_title, zr.is_sandbox, zr.record_status AS zenodo_record_db_status, zr.created_timestamp AS record_created_date, sf.filename",
-                "from": "FROM zenodo_records zr JOIN source_files sf ON zr.source_file_id = sf.file_id",
-                "where": "zr.project_id = ? AND zr.record_status = 'prepared' AND zr.zenodo_record_id IS NULL AND zr.is_sandbox = ?",
-                "order": "ORDER BY zr.last_updated_timestamp DESC",
+            "pending_preparation": {
+                "select": "SELECT sf.file_id AS source_file_db_id, sf.filename, sf.absolute_path, sf.status AS file_db_status, 'action_prepare_metadata' AS required_action",
+                "from": "FROM source_files sf LEFT JOIN zenodo_records zr ON sf.file_id = zr.source_file_id",
+                "where": "sf.project_id = ? AND sf.status IN ('pending', 'source_added', 'metadata_error', 'verified', 'Valid', 'Invalid', 'Problems', 'MTL Missing', 'Textures Missing', 'File Conflict') AND (zr.record_id IS NULL OR zr.record_status IN ('preparation_failed', 'discarded'))",
+                "order": "ORDER BY sf.filename ASC",
             },
             "drafts": {
                 "select": "SELECT zr.record_id AS local_record_db_id, zr.record_title, zr.record_status AS zenodo_record_db_status, zr.is_sandbox, zr.zenodo_record_id AS zenodo_api_deposition_id, zr.record_metadata_json, sf.filename, (SELECT COUNT(*) FROM record_files_map WHERE record_id = zr.record_id) AS total_files_in_record, (SELECT COUNT(*) FROM record_files_map WHERE record_id = zr.record_id AND upload_status = 'uploaded') AS uploaded_files_in_record",

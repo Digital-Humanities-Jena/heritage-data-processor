@@ -32,6 +32,7 @@
 - [ ] Upload Progress Bar.
 - [ ] Upload Report Downloads.
 - [ ] Fix Dark Mode.
+- [ ] Rename "./pipeline_components" to "./hdp_components" for consistency
 
 
 ### Metadata \& mapping
@@ -48,11 +49,17 @@
 - [ ] Validate if Source File in Spreadsheet File.
 
 
+### Uploads Section
+
+- [ ] Bundle source files and associated files before draft creation - create file deposition preview per pre-draft
+- [ ] Option to create local copies of records into defined directory
+
+
 ### Pipeline \& execution
 
 - [ ] Add Retry Parameters → Define alternative Model.
 - [ ] Evaluate functionalities for Subdirectory Scenario.
-- [ ] Production Logic.
+- [ ] Production / Non-Sandbox Logic with enhanced PII-related security mechanisms.
 - [ ] Save Pipeline directly after creation with initial Source File (no component if not saved explicitly).
 - [ ] Additionally use YAML as Pipeline instead of DB (= Overwrite?).
 - [ ] Write JSON Results Item per Item instead of one File; consider Row IDX if already processed.

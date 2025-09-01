@@ -9,9 +9,13 @@ databases/pipeline_system.db
 
 pipeline_components/*
 !pipeline_components/.gitkeep
+prompts/
+3DModels/
 
 build_macOS.sh
 codebase.sh
+
+HDPBackend.spec
 
 codebase/
 

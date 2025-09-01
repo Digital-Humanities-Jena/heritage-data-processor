@@ -857,6 +857,47 @@
                 </div>
 
                 <div id="newProjectStep4" class="new-project-step hidden space-y-4">
+                    <p class="text-sm text-gray-700">Configure file scanning for modality: <strong id="scanSettingsModality"></strong></p>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700">File Extensions to Scan:</label>
+                        <div id="fileExtensionCheckboxes" class="mt-2 space-y-2 border p-3 rounded-md max-h-32 overflow-y-auto">
+                            </div>
+                    </div>
+                    <div id="objOptionsContainer" class="hidden space-y-3 pt-3 border-t">
+                        <h4 class="text-sm font-medium text-gray-700">3D Model (OBJ) Options:</h4>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="addMtlFile" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="ml-2 text-sm text-gray-600">Identify and add associated MTL file to each Record</span>
+                        </label>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="addTextureFiles" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" disabled>
+                            <span class="ml-2 text-sm text-gray-500">Identify and add associated Texture files to each Record</span>
+                        </label>
+                        <div id="textureSearchContainer" class="pt-2 space-y-2 opacity-50 transition-opacity">
+                            <label class="block text-sm font-medium text-gray-700">Search for Texture Files in these directories:</label>
+                            <div id="textureSearchDirsContainer" class="space-y-2">
+                                </div>
+                            <button type="button" id="addTextureDirBtn" class="btn-secondary text-xs py-1 px-2" disabled>
+                                Add Directory to search for Textures...
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="newProjectStep5" class="new-project-step hidden space-y-4">
+                    <p class="text-sm text-gray-700">Review the files found in your input directory that match the scan criteria.</p>
+                    <div class="border rounded-md max-h-80 overflow-y-auto bg-gray-50">
+                        <div class="flex items-center p-2 border-b bg-gray-100 sticky top-0">
+                            <div class="flex-grow font-semibold text-xs text-gray-600">FILE</div>
+                            <div class="w-24 text-center font-semibold text-xs text-gray-600">STATUS</div>
+                        </div>
+                        <div id="foundFilesListContainer" class="p-2">
+                            <p class="text-sm text-gray-500 text-center py-4">No files found.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="newProjectStep6" class="new-project-step hidden space-y-4">
                     <p id="newProjectSummaryText" class="text-lg text-green-700"></p>
                     <p>You can now load this project from the dashboard or configure advanced settings like metadata mapping and processing pipelines later.</p>
                 </div>
@@ -1628,6 +1669,20 @@
             </div>
             <div class="modal-footer">
                 <button id="closeDownloadComponentsFooterBtn" class="btn-secondary">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="fileStatusModal" class="js-modal-backdrop hidden fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center p-4 border-b">
+                <h3 id="fileStatusModalTitle" class="text-xl font-semibold text-gray-800">File Status Report</h3>
+                <button id="closeFileStatusModalBtn" class="text-gray-500 hover:text-gray-800 text-3xl leading-none">&times;</button>
+            </div>
+            <div id="fileStatusModalBody" class="flex-grow p-6 overflow-y-auto space-y-4">
+                </div>
+            <div class="p-4 border-t bg-gray-50 text-right">
+                <button id="closeFileStatusModalFooterBtn" class="btn-secondary">Close</button>
             </div>
         </div>
     </div>

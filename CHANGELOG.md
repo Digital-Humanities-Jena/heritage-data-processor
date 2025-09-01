@@ -1,4 +1,10 @@
-# [**Version 0.1.0-alpha.2 (2025-08-15)**](https://github.com/Digital-Humanities-Jena/heritage-data-processor/releases/tag/v0.1.0-alpha.2)
+# [**Version 0.1.0-alpha.3 (2025-09-01)**](https://github.com/Digital-Humanities-Jena/heritage-data-processor/releases/tag/v0.1.0-alpha.3)
+
+### Major:
+- Implemented 3D Model Modality Template, including complex validation mechanisms and file overviews during project creation
+- Updated system to assign source and associated files to record entities
+
+# [**Version 0.1.0-alpha.2 (2025-08-29)**](https://github.com/Digital-Humanities-Jena/heritage-data-processor/releases/tag/v0.1.0-alpha.2)
 
 ### Major:
 - Implemented **HDP Component Retrieval & Registration System**

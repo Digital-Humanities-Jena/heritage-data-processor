@@ -31,13 +31,13 @@ tables:
         event: AFTER UPDATE
         action: "UPDATE project_info SET last_modified_timestamp = CURRENT_TIMESTAMP WHERE project_id = NEW.project_id;"
 
-  # --- Configuration (enhanced) ---
+  # --- Configuration ---
   project_configuration:
     columns:
-      - name: config_id  # Added primary key
+      - name: config_id
         type: INTEGER
         constraints: [PRIMARY KEY AUTOINCREMENT]
-      - name: project_id  # Added project reference
+      - name: project_id
         type: INTEGER
         constraints: [NOT NULL]
       - name: config_key
@@ -51,8 +51,29 @@ tables:
       - type: FOREIGN KEY
         columns: [project_id]
         references: project_info(project_id)
-      - type: UNIQUE  # Ensure unique keys per project
+      - type: UNIQUE
         columns: [project_id, config_key]
+
+  file_scan_settings:
+    columns:
+      - name: scan_settings_id
+        type: INTEGER
+        constraints: [PRIMARY KEY AUTOINCREMENT]
+      - name: project_id
+        type: INTEGER
+        constraints: [NOT NULL]
+      - name: modality
+        type: TEXT
+        constraints: [NOT NULL]
+      - name: scan_options
+        type: TEXT # JSON object with settings
+        constraints: [NOT NULL]
+    constraints:
+      - type: FOREIGN KEY
+        columns: [project_id]
+        references: project_info(project_id)
+      - type: UNIQUE
+        columns: [project_id, modality]
 
   # --- Source files with enhanced relationships ---
   source_files:
@@ -60,7 +81,7 @@ tables:
       - name: file_id
         type: INTEGER
         constraints: [PRIMARY KEY AUTOINCREMENT]
-      - name: project_id  # Added project reference
+      - name: project_id
         type: INTEGER
         constraints: [NOT NULL]
       - name: absolute_path
@@ -79,10 +100,10 @@ tables:
         constraints: [NOT NULL]
       - name: mime_type
         type: TEXT
-      - name: file_type  # Added classification (source, derived, etc.)
+      - name: file_type
         type: TEXT
         constraints: [NOT NULL, DEFAULT 'source']
-      - name: parent_file_id  # Added reference to parent file
+      - name: parent_file_id
         type: INTEGER
       - name: status
         type: TEXT
@@ -121,7 +142,7 @@ tables:
       - name: idx_source_files_generated_by_step
         columns: [generated_by_pipeline_step_id]
 
-  # --- Batch Operations (new table) ---
+  # --- Batch Operations ---
   batches:
     columns:
       - name: batch_id
@@ -141,7 +162,7 @@ tables:
       - name: status  # e.g., 'pending', 'in_progress', 'completed', 'error'
         type: TEXT
         constraints: [NOT NULL, DEFAULT 'pending']
-      - name: completion_percentage  # Track progress
+      - name: completion_percentage
         type: REAL
         constraints: [DEFAULT 0]
     constraints:
@@ -151,7 +172,7 @@ tables:
       - type: UNIQUE
         columns: [project_id, batch_name]
 
-  # --- Metadata Mappings (new table) ---
+  # --- Metadata Mappings ---
   metadata_mapping_files:
     columns:
       - name: mapping_id
@@ -184,7 +205,7 @@ tables:
       - type: UNIQUE
         columns: [project_id, mapping_name]
 
-  # --- Extracted Metadata Values (new table) ---
+  # --- Extracted Metadata Values ---
   metadata_values:
     columns:
       - name: value_id
@@ -219,7 +240,7 @@ tables:
       - name: idx_metadata_values_field
         columns: [field_name]
 
-  # --- Zenodo Records (enhanced) ---
+  # --- Zenodo Records ---
   zenodo_records:
     columns:
       - name: record_id
@@ -228,12 +249,12 @@ tables:
       - name: project_id
         type: INTEGER
         constraints: [NOT NULL]
-      - name: batch_id  # Added batch reference
+      - name: batch_id
         type: INTEGER
-      - name: source_file_id  # Primary source file for this record
+      - name: source_file_id
         type: INTEGER
         constraints: [NOT NULL]
-      - name: mapping_id  # Metadata mapping used
+      - name: mapping_id
         type: INTEGER
       - name: zenodo_record_id
         type: INTEGER
@@ -245,7 +266,7 @@ tables:
         type: TEXT
       - name: record_title
         type: TEXT
-      - name: record_metadata_json  # Complete metadata as JSON
+      - name: record_metadata_json
         type: TEXT
       - name: file_data_json
         type: TEXT
@@ -255,10 +276,10 @@ tables:
       - name: is_sandbox
         type: INTEGER
         constraints: [NOT NULL, DEFAULT 1]
-      - name: version  # Added version tracking
+      - name: version
         type: INTEGER
         constraints: [DEFAULT 1]
-      - name: previous_version_id  # Reference to previous version
+      - name: previous_version_id
         type: INTEGER
       - name: creation_api_response
         type: TEXT
@@ -297,7 +318,7 @@ tables:
       - name: idx_zenodo_records_source
         columns: [source_file_id]
 
-  # --- Record Files Mapping (enhanced) ---
+  # --- Record Files Mapping ---
   record_files_map:
     columns:
       - name: map_id
@@ -311,7 +332,7 @@ tables:
         constraints: [NOT NULL]
       - name: file_path
         type: TEXT
-      - name: file_purpose  # Added to indicate file role
+      - name: file_purpose  # indicates file role
         type: TEXT
         constraints: [NOT NULL, DEFAULT 'main']  # main, thumbnail, metadata, etc.
       - name: zenodo_file_id
@@ -353,10 +374,10 @@ tables:
       - name: modality
         type: TEXT
         constraints: [NOT NULL]
-      - name: component_name # Internal name, can now be repeated for same project/modality
+      - name: component_name
         type: TEXT
         constraints: [NOT NULL]
-      - name: component_order # Execution order for this modality
+      - name: component_order
         type: INTEGER
         constraints: [NOT NULL]
       - name: parameters
@@ -381,13 +402,13 @@ tables:
         event: AFTER UPDATE
         action: "UPDATE project_pipelines SET last_modified_timestamp = CURRENT_TIMESTAMP WHERE pipeline_step_id = NEW.pipeline_step_id;"
 
-  # --- API Log (enhanced) ---
+  # --- API Log ---
   api_log:
     columns:
       - name: log_id
         type: INTEGER
         constraints: [PRIMARY KEY AUTOINCREMENT]
-      - name: project_id  # Added project reference
+      - name: project_id
         type: INTEGER
         constraints: [NOT NULL]
       - name: timestamp
@@ -397,7 +418,7 @@ tables:
         type: INTEGER
       - name: file_id
         type: INTEGER
-      - name: batch_id  # Added batch reference
+      - name: batch_id
         type: INTEGER
       - name: http_method
         type: TEXT
@@ -441,7 +462,7 @@ tables:
       - name: idx_api_log_status
         columns: [status]
 
-  # --- API Credentials (new table) ---
+  # --- API Credentials ---
   api_credentials:
     columns:
       - name: credential_id
@@ -456,7 +477,7 @@ tables:
       - name: credential_type  # 'zenodo_api_key', etc.
         type: TEXT
         constraints: [NOT NULL]
-      - name: credential_value  # Consider encryption
+      - name: credential_value
         type: TEXT
         constraints: [NOT NULL]
       - name: is_sandbox
