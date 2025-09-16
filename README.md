@@ -10,9 +10,13 @@ More information about this application will be provided soon.
 #### **Pipeline Components**
 The modular **Pipeline Components** that form the core of this application's processing capabilities will be added in an upcoming commit. A comprehensive **Developer's Guide** for creating and modifying these components will follow.
 
-### **Planned Updates for Upcoming Version (0.1.0-alpha.4)**
-* Complex Pipeline Components (3D- and CUDA-related)
-* Essential bugfixes during Metadata forwarding
+### **Planned Updates for Upcoming Version (0.1.0-alpha.5)**
+* Enable Zenodo Production Mode
+* Enable Complex Pipeline Components (3D- and CUDA-related)
+* Add Test Datasets, Excel/CSV Templates and CLI/Scripting Guides
+* Essential bugfixes for Metadata forwarding
+* Add refresh of HDP components after downloading HDP components
+* Add autosave mechanism for Pipeline Constructor and add warnings if unsaved
 
 
 **Known Bugs** and some missing features are listed in the [Backlog](./BACKLOG.md) (incomplete).
@@ -48,20 +52,42 @@ xattr -d com.apple.quarantine /path/to/Heritage\ Data\ Processor.app
 ### Developer Installation & Setup (recommended for now)
 If you wish to run the application from the source code, you will need to set up both a Python and a Node.js environment.
 
+#### Recommendations for macOS Users
+For macOS users, I recommend using `brew`, install it with this command:
+
+```bash
+# --- Install brew ---
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# --- Verify brew Installation
+brew doctor
+```
+
+Afterwards, follow the instructions to install Command Line Tools for Xcode, then copy and execute the commands highlighted in green after brew was installed successfully.
+
+
 #### Python Environment (uv)
 1. **Install uv**:
-   Follow the official installation instructions for uv on your operating system.
+   Follow the official installation instructions for uv on your operating system, or use this command:
+
+   ```bash
+   # --- Install UV ---
+   curl -LsSf https://astral.sh/uv/install.sh | sh
+   
+   # --- Verify Installation ---
+   uv --version
+   ```
 2. **Create and Activate Virtual Environment:**
    Navigate to the project's root directory and run the following commands:
 
     ```bash
-    # --- Create a virtual environment named .venv using Python 3.11 ---
+    # --- Create Virtual Environment ---
     uv venv python=3.11
 
-    # --- Activate the environment ---
-    # macOS/Linux:
+    # --- Activate Virtual Environment ---
+    # - macOS/Linux:
     source .venv/bin/activate
-    # Windows:
+    # - Windows:
     .venv\Scripts\activate
     ```
 3. **Install Python Dependencies:**
@@ -75,6 +101,23 @@ The user interface is built using Electron and requires Node.js.
 1. **Install Node.js:**
    Download and install a recent LTS version of Node.js from the official website.
 
+   #### macOS
+   ```bash
+   brew install node
+   ```
+
+   #### Linux
+   ```bash
+   sudo apt update
+   sudo apt install nodejs npm
+   ```
+
+   ### Validate Installation
+   ```bash
+   node -v
+   npm -v
+   ```
+
 2. **Install Node Dependencies:**
     In the project's root directory, run the following command to install the necessary packages listed in package.json:
     
@@ -82,7 +125,19 @@ The user interface is built using Electron and requires Node.js.
     npm install
     ```
 
-3. **Start the Application:**
+3. **Install other Dependencies:**
+   #### Mac OS
+   ```bash
+   brew install libmagic
+   ```
+
+   #### Linux & Windows (via WSL)
+   ```bash
+   sudo apt-get update
+   sudo apt-get install libmagic1-dev
+   ```
+
+4. **Start the Application:**
     To launch the Heritage Data Processor, run:
 
     ```bash

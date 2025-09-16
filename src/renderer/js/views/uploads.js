@@ -75,6 +75,7 @@ let availablePipelines = [];
 let currentPendingOperationsRecords = [];
 let currentPublishedRecords = [];
 let currentItemsInView = [];
+let fileBundleCache = {};
 
 // --- Main View & Tab Logic ---
 
@@ -251,6 +252,11 @@ function renderItemsForTab(items, paneEl) {
             }
 
             if (currentUploadsTab === 'pending_preparation') {
+                const totalFiles = item.total_bundle_files || 1;
+                const bundleBtnHtml = totalFiles > 1 
+                    ? `<button data-source-file-id="${item.source_file_db_id}" data-filename="${item.filename}" class="view-file-bundle-btn btn-secondary text-xs py-1 px-2">View Bundle (${totalFiles})</button>`
+                    : '';
+
                 return `<div class="upload-item p-3 bg-white rounded-md border border-gray-200 shadow-sm flex items-start space-x-3" data-item-id="${item.source_file_db_id}">
                             ${checkboxHtml}
                             <div class="flex-grow min-w-0">
@@ -258,6 +264,7 @@ function renderItemsForTab(items, paneEl) {
                                 <p class="text-xs text-gray-500">DB ID: ${item.source_file_db_id} | Status: <span class="font-medium">${item.file_db_status || 'N/A'}</span></p>
                             </div>
                             <div class="flex-shrink-0 space-x-1">
+                                ${bundleBtnHtml}
                                 <button data-source-file-id="${item.source_file_db_id}" class="edit-metadata-btn btn-secondary text-xs py-1 px-2">Edit</button>
                                 <button data-source-file-id="${item.source_file_db_id}" data-filename="${item.filename}" class="prepare-metadata-btn btn-primary text-xs py-1 px-2">Prepare Metadata</button>
                             </div>
@@ -319,6 +326,7 @@ function attachUploadsEventListeners(paneEl) {
     paneEl.querySelectorAll('.create-new-version-btn').forEach(btn => btn.addEventListener('click', handleCreateNewVersionClick));
     paneEl.querySelectorAll('.view-draft-files-btn').forEach(btn => btn.addEventListener('click', handleViewDraftFilesClick));
     paneEl.querySelectorAll('.item-select-checkbox').forEach(checkbox => checkbox.addEventListener('change', handleItemSelectionChange));
+    paneEl.querySelectorAll('.view-file-bundle-btn').forEach(btn => btn.addEventListener('click', handleViewFileBundleClick));
 }
 
 // --- Single-Item Action Handlers ---
@@ -339,6 +347,7 @@ async function handlePrepareMetadataClick(event) {
         logFullBackendResponse(result);
         if (!result.success) throw new Error(result.error || 'Preparation failed');
         updateUploadProgressUI({ status: result.message, progress: 100, type: 'success' });
+        switchToUploadsTab('pending_operations');
         // clearZenodoSchemaCache();
     } catch (error) {
         updateUploadProgressUI({ status: `Error: ${error.message}`, progress: 100, type: 'error'});
@@ -430,6 +439,210 @@ async function openDraftFilesModal(recordId) {
         }
     }
 
+/**
+ * Recursively renders a file hierarchy node for the bundle modal.
+ */
+function createFileBundleNodeHTML(fileNode, level) {
+    const indent = level * 20; // 20px indent per level
+    const iconMap = {
+        source: '<svg class="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>',
+        primary: '<svg class="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        secondary: '<svg class="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14z"></path></svg>',
+        archive: '<svg class="w-4 h-4 text-indigo-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4m-4-4h4m-4 8h4m-7 0h.01M9 3h6a2 2 0 012 2v3H7V5a2 2 0 012-2z"></path></svg>',
+        archived_file: '<svg class="w-4 h-4 text-indigo-400 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>'
+    };
+    const icon = iconMap[fileNode.file_type] || iconMap['source'];
+
+    const statusClasses = {
+        "Valid": "text-green-600 hover:text-green-800",
+        "Invalid": "text-red-600 hover:text-red-800",
+        "Problems": "text-red-600 hover:text-red-800 font-bold",
+        "MTL Missing": "text-amber-600 hover:text-amber-800",
+        "Textures Missing": "text-amber-600 hover:text-amber-800",
+        "File Conflict": "text-purple-600 hover:text-purple-800 font-bold",
+        "Pending": "text-blue-600 hover:text-blue-800"
+    };
+    const statusClass = statusClasses[fileNode.status] || "text-gray-600";
+
+    // Add archive info text if this is an archived file
+    const archiveInfo = fileNode.type === 'archived_file' 
+        ? `<span class="ml-2 text-xs italic text-indigo-700">(archived)</span>` // We don't know the archive name from this context, but this is enough
+        : '';
+
+    let rowHTML = `
+        <div class="flex items-center py-1.5 text-sm">
+            <div class="flex-grow flex items-center min-w-0" style="padding-left: ${indent}px;">
+                ${icon}
+                <span class="text-gray-800 truncate" title="${fileNode.absolute_path}">${fileNode.filename}</span>
+                ${archiveInfo}
+            </div>
+            <div class="w-24 text-center flex-shrink-0">
+                <button class="status-btn hover:underline text-xs font-medium ${statusClass}" data-file-id="${fileNode.file_id}">
+                    ${fileNode.status}
+                </button>
+            </div>
+        </div>
+    `;
+
+    if (fileNode.children && fileNode.children.length > 0) {
+        rowHTML += fileNode.children.map(child => createFileBundleNodeHTML(child, level + 1)).join('');
+    }
+    return rowHTML;
+}
+
+
+async function handleViewFileBundleClick(event) {
+    const sourceFileId = event.target.dataset.sourceFileId;
+    const filename = event.target.dataset.filename;
+    
+    const modal = document.getElementById('fileBundleModal');
+    const titleEl = document.getElementById('fileBundleModalTitle');
+    const bodyEl = document.getElementById('fileBundleModalBody');
+    
+    if (!modal || !titleEl || !bodyEl) return;
+
+    titleEl.textContent = `File Bundle: ${filename}`;
+    bodyEl.innerHTML = '<p class="text-gray-500 text-center">Loading bundle contents...</p>';
+    modal.classList.remove('hidden');
+    
+    fileBundleCache = {};
+
+    // Recursive function to populate the cache
+    function populateBundleCache(fileNode) {
+        if (!fileNode) return;
+        fileBundleCache[fileNode.file_id] = fileNode;
+        if (fileNode.children) {
+            fileNode.children.forEach(populateBundleCache);
+        }
+    }
+
+    try {
+        const response = await fetch(`${PYTHON_API_BASE_URL}/api/files/${sourceFileId}/hierarchy`);
+        const hierarchyData = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(hierarchyData.error || 'Failed to fetch file hierarchy');
+        }
+
+        // Populate the cache *before* rendering
+        populateBundleCache(hierarchyData);
+
+        const headerHtml = `
+            <div class="flex items-center p-2 border-b bg-gray-100 sticky top-0">
+                <div class="flex-grow font-semibold text-xs text-gray-600 min-w-0">FILE</div>
+                <div class="w-24 text-center font-semibold text-xs text-gray-600 flex-shrink-0">STATUS</div>
+            </div>
+        `;
+        const bodyHtml = createFileBundleNodeHTML(hierarchyData, 0);
+        bodyEl.innerHTML = `<div class="border rounded-md bg-gray-50 overflow-hidden">${headerHtml}<div class="p-2">${bodyHtml}</div></div>`;
+
+    } catch (error) {
+        bodyEl.innerHTML = `<p class="text-red-500 text-center">Error loading file data: ${error.message}</p>`;
+    }
+}
+
+function openStatusModal(fileData) {
+    const fileStatusModal = document.getElementById('fileStatusModal');
+    const fileStatusModalTitle = document.getElementById('fileStatusModalTitle');
+    const fileStatusModalBody = document.getElementById('fileStatusModalBody');
+
+    if (!fileStatusModal || !fileStatusModalTitle || !fileStatusModalBody) return;
+
+    fileStatusModalTitle.textContent = `Status Report: ${fileData.name || fileData.filename}`;
+    
+    let path = fileData.path || fileData.absolute_path;
+
+    let bodyHTML = `
+        <div>
+            <h4 class="font-semibold text-gray-800">File Path</h4>
+            <p class="font-mono text-xs bg-gray-100 p-2 rounded mt-1 break-all">${path}</p>
+        </div>
+    `;
+
+    // Try to parse the report if it's a string (from our DB query)
+    let report = fileData.validation_report;
+    if (!report && fileData.error_message) {
+         try {
+            report = JSON.parse(fileData.error_message);
+         } catch(e) {
+            console.warn("Could not parse validation report from error_message field");
+            report = { errors: [fileData.error_message] }; // Fallback
+         }
+    }
+
+
+    if (report) {
+        if (report.conflicts && report.conflicts.length > 0) {
+            bodyHTML += `
+                <div class="mt-4">
+                    <h4 class="font-semibold text-purple-700">File Conflicts</h4>
+                    <p class="text-sm text-gray-700 mt-1">The following texture files could not be automatically resolved because multiple, non-identical versions were found. Please resolve this manually by ensuring only one correct version exists in the search paths.</p>
+                    ${report.conflicts.map(conflict => `
+                        <div class="mt-2 pl-2 border-l-2 border-purple-200">
+                            <p class="font-semibold text-sm text-purple-800">${conflict.filename}</p>
+                            <p class="text-xs text-gray-600 italic">"${conflict.message}"</p>
+                            <ul class="list-disc list-inside text-xs font-mono text-gray-600 mt-1">
+                                ${conflict.candidates.map(path => `<li>${path}</li>`).join('')}
+                            </ul>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+        }
+        // Display Validation Issues
+        if (report.errors && report.errors.length > 0) {
+            bodyHTML += `
+                <div class="mt-4">
+                    <h4 class="font-semibold text-red-700">Validation Issues</h4>
+                    <ul class="list-disc list-inside text-sm text-red-600 mt-1 space-y-1">
+                        ${report.errors.map(err => `<li>${err}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        } else {
+             bodyHTML += `
+                <div class="mt-4">
+                    <h4 class="font-semibold text-green-700">Validation Status</h4>
+                    <p class="text-sm text-gray-700 mt-1">File appears to be valid and readable.</p>
+                </div>
+            `;
+        }
+
+        if (report.missing_textures && report.missing_textures.length > 0) {
+            bodyHTML += `
+                <div class="mt-4">
+                    <h4 class="font-semibold text-amber-700 mt-3">Missing Texture Files</h4>
+                    <div class="mt-1 p-2 border rounded-md bg-amber-50 text-xs font-mono text-amber-800 space-y-1">
+                        ${report.missing_textures.map(filename => `<p>${filename}</p>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Display Validation Details
+        if (report.details && Object.keys(report.details).length > 0) {
+            bodyHTML += `
+                <div class="mt-4">
+                    <h4 class="font-semibold text-gray-800 mt-3">Validation Details</h4>
+                    <div class="text-sm text-gray-700 mt-1 bg-gray-50 p-2 rounded border">
+                        ${Object.entries(report.details).map(([key, value]) => `<p><strong>${key.replace(/_/g, ' ')}:</strong> ${value}</p>`).join('')}
+                    </div>
+                </div>
+            `;
+        }
+    } else {
+         bodyHTML += `
+            <div class="mt-4">
+                <h4 class="font-semibold text-gray-700">Validation Report</h4>
+                <p class="text-sm text-gray-500 mt-1">No detailed validation report is available for this file.</p>
+            </div>
+        `;
+    }
+
+    fileStatusModalBody.innerHTML = bodyHTML;
+    fileStatusModal.classList.remove('hidden');
+}
+
 async function handleCreateApiDraftClick(event) {
     const localRecordId = event.target.dataset.localRecordId;
     openUploadProgressModal(`Record ID ${localRecordId}`);
@@ -442,6 +655,7 @@ async function handleCreateApiDraftClick(event) {
         logFullBackendResponse(result);
         if (!result.success) throw new Error(result.error || 'Draft creation failed');
         updateUploadProgressUI({ status: result.message, progress: 100, type: 'success' });
+        switchToUploadsTab('drafts');
         // clearZenodoSchemaCache();
     } catch (error) {
         updateUploadProgressUI({ status: `Error: ${error.message}`, progress: 100, type: 'error'});
@@ -503,6 +717,7 @@ async function handleDiscardDraftClick(event) {
         logFullBackendResponse(result);
         if (!result.success) throw new Error(result.error || 'Failed to discard draft.');
         updateUploadProgressUI({ status: result.message, progress: 100, type: 'success' });
+        switchToUploadsTab('pending_operations');
     } catch (error) {
         updateUploadProgressUI({ status: `Error: ${error.message}`, progress: 100, type: 'error'});
     } finally {
@@ -1182,6 +1397,11 @@ export function initUploads() {
             updateUploadProgressUI({ status: `Batch Error: ${error.message}`, progress: 100, type: 'error' });
             showToast(`Batch Action Failed: ${error.message}`, "error");
         } finally {
+            if (actionType === 'prepare_metadata') {
+                switchToUploadsTab('pending_operations');
+            } else if (actionType === 'create_api_draft') {
+                switchToUploadsTab('drafts');
+            }
             selectedUploadItems.clear();
             await refreshUploadsView();
             updateBatchActionUI();
@@ -1253,6 +1473,7 @@ export function initUploads() {
 
             if (result.success) {
                 updateUploadProgressUI({ status: result.message, progress: 100, type: 'success' });
+                switchToUploadsTab('pending_operations');
                 // clearZenodoSchemaCache();
             } else {
                 const errorMsg = result.validation_errors ? `Validation Failed: ${result.validation_errors.join(', ')}` : result.error;
@@ -1271,6 +1492,35 @@ export function initUploads() {
 
     if (closeDraftFilesModalBtn) closeDraftFilesModalBtn.addEventListener('click', () => draftFilesModal.classList.add('hidden'));
     if (closeDraftFilesModalFooterBtn) closeDraftFilesModalFooterBtn.addEventListener('click', () => draftFilesModal.classList.add('hidden'));
+
+    // File Bundle Modal Listeners
+    const fileBundleModal = document.getElementById('fileBundleModal');
+    const closeFileBundleModalBtn = document.getElementById('closeFileBundleModalBtn');
+    const closeFileBundleModalFooterBtn = document.getElementById('closeFileBundleModalFooterBtn');
+
+    if (fileBundleModal && closeFileBundleModalBtn) {
+        closeFileBundleModalBtn.addEventListener('click', () => fileBundleModal.classList.add('hidden'));
+    }
+    if (fileBundleModal && closeFileBundleModalFooterBtn) {
+        closeFileBundleModalFooterBtn.addEventListener('click', () => fileBundleModal.classList.add('hidden'));
+    }
+
+    const fileBundleModalBody = document.getElementById('fileBundleModalBody');
+    if (fileBundleModalBody) {
+        fileBundleModalBody.addEventListener('click', (event) => {
+            const statusBtn = event.target.closest('.status-btn');
+            if (statusBtn) {
+                const fileId = statusBtn.dataset.fileId;
+                const fileData = fileBundleCache[fileId];
+                if (fileData) {
+                    openStatusModal(fileData);
+                } else {
+                    console.error("Could not find file data in bundle cache for ID:", fileId);
+                    showToast("Could not retrieve file details.", "error");
+                }
+            }
+        });
+    }
     
     // Versioning Listeners
     const initiateNewVersionBtn = document.getElementById('initiateNewVersionBtn');

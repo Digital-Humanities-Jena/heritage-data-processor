@@ -667,18 +667,57 @@ def store_metadata_for_file(
         # print(f"   Created new Zenodo DB record (ID: {db_record_id}) in 'prepared' state for file ID {file_id}.") # Already printed in caller
 
         # Link file to record if new record
-        cursor.execute(
-            "SELECT map_id FROM record_files_map WHERE record_id = ? AND file_id = ?", (db_record_id, file_id)
-        )
-        if not cursor.fetchone():
-            source_file_path = cursor.execute(
-                "SELECT absolute_path FROM source_files WHERE file_id = ?", (file_id,)
-            ).fetchone()
-            file_path_to_store = source_file_path[0] if source_file_path else "N/A"
-            cursor.execute(
-                "INSERT INTO record_files_map (record_id, file_id, file_path, file_purpose, upload_status) VALUES (?, ?, ?, 'main', 'pending')",
-                (db_record_id, file_id, file_path_to_store),
+        # Helper function to recursively find all children from the source_files table
+        def find_all_children(current_file_id):
+            """Recursively finds all descendant file IDs for a given parent file ID."""
+            child_ids = []
+            cursor.execute("SELECT file_id FROM source_files WHERE parent_file_id = ?", (current_file_id,))
+            children = cursor.fetchall()
+            for child_row in children:
+                child_id = child_row[0]
+                child_ids.append(child_id)
+                child_ids.extend(find_all_children(child_id))  # Recurse
+            return child_ids
+
+        # Get all file IDs in the bundle (parent + all descendants)
+        all_file_ids_in_bundle = [file_id] + find_all_children(file_id)
+
+        # Filter this list to get ONLY UPLOADABLE files.
+        # We exclude any file explicitly marked as 'archived_file' because it's already inside a zip archive.
+
+        uploadable_file_ids = []
+        if all_file_ids_in_bundle:
+            # Create a string of placeholders like "?,?,?" for the query
+            placeholders = ",".join(["?"] * len(all_file_ids_in_bundle))
+            query = (
+                f"SELECT file_id FROM source_files WHERE file_id IN ({placeholders}) AND file_type != 'archived_file'"
             )
+
+            cursor.execute(query, tuple(all_file_ids_in_bundle))
+            uploadable_file_rows = cursor.fetchall()
+            uploadable_file_ids = [row[0] for row in uploadable_file_rows]
+
+        # Ensure all files in the bundle are associated with the record.
+        # First, clear any existing maps for this record to handle re-preparation cleanly.
+        cursor.execute("DELETE FROM record_files_map WHERE record_id = ?", (db_record_id,))
+
+        # Now, insert all files from the bundle into the map
+        files_to_map_params = []
+        for bundle_file_id in uploadable_file_ids:
+            source_file_path_row = cursor.execute(
+                "SELECT absolute_path FROM source_files WHERE file_id = ?", (bundle_file_id,)
+            ).fetchone()
+            file_path_to_store = source_file_path_row[0] if source_file_path_row else "N/A"
+
+            # The original source file (parent) is 'main', all children are 'derived'
+            file_purpose = "main" if bundle_file_id == file_id else "derived"
+
+            files_to_map_params.append((db_record_id, bundle_file_id, file_path_to_store, file_purpose, "pending"))
+
+        cursor.executemany(
+            "INSERT INTO record_files_map (record_id, file_id, file_path, file_purpose, upload_status) VALUES (?, ?, ?, ?, ?)",
+            files_to_map_params,
+        )
 
     cursor.execute(
         "UPDATE source_files SET status = 'metadata_ready', error_message = NULL, last_processed_timestamp = CURRENT_TIMESTAMP WHERE file_id = ?",

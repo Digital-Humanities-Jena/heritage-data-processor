@@ -1,3 +1,16 @@
+# [**Version 0.1.0-alpha.4 (2025-09-16)**](https://github.com/Digital-Humanities-Jena/heritage-data-processor/releases/tag/v0.1.0-alpha.4)
+### Major:
+- Added Hierarchical File Bundling
+  - This puts associated files into the same, not in separate records
+  - It archives associated files within subdirectories in order to maintain the correct directory structure
+- Added File Bundle Modal to Uploads View
+
+### Minor:
+- Fixed error during tab switching in Uploads view
+- Fixed automatic tab switching after successful step process
+- Updated installation instructions in README
+- Fixed z-value of File Validation Status Modal
+
 # [**Version 0.1.0-alpha.3 (2025-09-01)**](https://github.com/Digital-Humanities-Jena/heritage-data-processor/releases/tag/v0.1.0-alpha.3)
 
 ### Major:

@@ -1,7 +1,7 @@
 # server_app/routes/data_query.py
 from flask import Blueprint, jsonify, request
 
-from ..services.database import query_db
+from ..services.database import get_db_connection, query_db
 from ..services.project_manager import project_manager
 from ..utils.decorators import project_required
 
@@ -135,3 +135,57 @@ def get_record_files(record_id):
         return jsonify({"error": "Database query failed"}), 500
 
     return jsonify(files)
+
+
+def fetch_hierarchy_recursive(conn, node_id: int) -> dict | None:
+    """
+    Recursive helper to fetch a node and all its children from the source_files table.
+    Assumes 'conn' is an open database connection.
+    """
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT file_id, filename, absolute_path, file_type, status, error_message FROM source_files WHERE file_id = ?",
+        (node_id,),
+    )
+    node_row = cursor.fetchone()
+
+    if not node_row:
+        return None
+
+    node = dict(node_row)
+    node["children"] = []
+
+    # Find all direct children
+    cursor.execute("SELECT file_id FROM source_files WHERE parent_file_id = ? ORDER BY filename", (node_id,))
+    children_rows = cursor.fetchall()
+
+    for child_row in children_rows:
+        child_node = fetch_hierarchy_recursive(conn, child_row["file_id"])
+        if child_node:
+            node["children"].append(child_node)
+
+    return node
+
+
+@data_query_bp.route("/files/<int:file_id>/hierarchy", methods=["GET"])
+@project_required
+def get_file_hierarchy(file_id):
+    """
+    Recursively fetches a root file and all its children (MTLs, textures, etc.)
+    to build a complete hierarchy for display in a modal.
+    """
+    conn = None
+    try:
+        conn = get_db_connection(project_manager.db_path)
+        hierarchy = fetch_hierarchy_recursive(conn, file_id)
+        conn.close()
+
+        if not hierarchy:
+            return jsonify({"error": "File not found"}), 404
+
+        return jsonify(hierarchy)
+
+    except Exception as e:
+        if conn:
+            conn.close()
+        return jsonify({"error": str(e)}), 500

@@ -1,6 +1,6 @@
 {
   "name": "heritage-data-processor",
-  "version": "0.1.0-alpha.2",
+  "version": "0.1.0-alpha.4",
   "description": "Desktop & Server Application to process and persistently store digital heritage data using constructed pipelines",
   "main": "src/main/main.js",
   "scripts": {

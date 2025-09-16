@@ -24,6 +24,9 @@
 
 ### UI/UX Features & Bugs
 
+- [ ] Handle cases with large file quantities during project creation / scanning
+- [ ] Prohibit adding / selecting pipeline to database if it was not saved before - warning popup
+- [ ] New Directory creation in File Dialog is currently blocked (at least Mac OS)
 - [ ] Pipeline Constructor shows that the Zenodo Metadata was not set / mapped yet
 - [ ] Menubar Items, including Components.
 - [ ] "Dry" Component run: Show Result (JSON) directly in App.

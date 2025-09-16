@@ -41,6 +41,7 @@ const addTextureFiles = document.getElementById('addTextureFiles');
 const textureSearchContainer = document.getElementById('textureSearchContainer');
 const textureSearchDirsContainer = document.getElementById('textureSearchDirsContainer');
 const addTextureDirBtn = document.getElementById('addTextureDirBtn');
+const archiveSubdirectories = document.getElementById('archiveSubdirectories');
 
 const newProjectStep5 = document.getElementById('newProjectStep5');
 const foundFilesListContainer = document.getElementById('foundFilesListContainer');
@@ -110,6 +111,10 @@ function updateObjOptionsVisibility() {
         textureSearchContainer.style.opacity = '0.5';
         addTextureDirBtn.disabled = true;
         textureSearchDirsContainer.querySelectorAll('.user-added-dir').forEach(el => el.remove());
+    }
+
+    if (archiveSubdirectories) {
+        archiveSubdirectories.checked = true;
     }
 }
 
@@ -263,7 +268,8 @@ async function handleNewProjectNext() {
             obj_options: {
                 add_mtl: addMtlFile.checked,
                 add_textures: addTextureFiles.checked,
-                texture_search_paths: addTextureFiles.checked ? textureSearchPaths : []
+                texture_search_paths: addTextureFiles.checked ? textureSearchPaths : [],
+                archive_subdirectories: archiveSubdirectories.checked
             }
         };
 
@@ -369,11 +375,14 @@ function addTextureDirectoryRow(path) {
  */
 function createFileRowHTML(file, level) {
     const indent = level * 20; // 20px indent per level
-    const icon = {
-        source: '<svg class="w-4 h-4 text-blue-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>',
-        primary: '<svg class="w-4 h-4 text-green-600 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
-        secondary: '<svg class="w-4 h-4 text-gray-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14z"></path></svg>'
-    }[file.type] || '';
+    const iconMap = {
+        source: '<svg class="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>',
+        primary: '<svg class="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        secondary: '<svg class="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14z"></path></svg>',
+        archive: '<svg class="w-4 h-4 text-indigo-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4m-4-4h4m-4 8h4m-7 0h.01M9 3h6a2 2 0 012 2v3H7V5a2 2 0 012-2z"></path></svg>',
+        archived_file: '<svg class="w-4 h-4 text-indigo-400 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>'
+    };
+    const icon = iconMap[file.type] || iconMap['source'];
 
     const statusClasses = {
         "Valid": "text-green-600 hover:text-green-800",
@@ -387,15 +396,21 @@ function createFileRowHTML(file, level) {
     const statusClass = statusClasses[file.status] || "text-gray-600";
     
     // The unique path is stored as an ID to look up in the cache later.
-    const fileId = file.path;
+    const fileId = file.path; 
+
+    // Add archive info text if this is an archived file
+    const archiveInfo = file.type === 'archived_file' 
+        ? `<span class="ml-2 text-xs italic text-indigo-700">(archived in ${file.archive_name || 'archive.zip'})</span>`
+        : '';
 
     let rowHTML = `
         <div class="flex items-center py-1.5 text-sm">
-            <div class="flex-grow flex items-center" style="padding-left: ${indent}px;">
+            <div class="flex-grow flex items-center min-w-0" style="padding-left: ${indent}px;">
                 ${icon}
-                <span class="text-gray-800" title="${file.path}">${file.name}</span>
+                <span class="text-gray-800 truncate" title="${file.path}">${file.name}</span>
+                ${archiveInfo}
             </div>
-            <div class="w-24 text-center">
+            <div class="w-24 text-center flex-shrink-0">
                 <button class="status-btn hover:underline text-xs font-medium ${statusClass}" data-file-id="${fileId}">
                     ${file.status}
                 </button>
