@@ -1,6 +1,6 @@
 # HDP Pipeline Component Developer's Guide and References
 
-**Note**: This version of the Developer's Guide is linked to the **HDP Component Schema Version 0.1.0-alpha.2**
+**Note**: This version of the Developer's Guide is linked to the **HDP Component Schema Version 0.1.0-alpha.2** and is still under development, both regarding its structure and integration within the HDP. The mentioned **Component Uploader** is still under development, and fields regarding the `requirements` are currently placeholders for upcoming features regarding the installation of HDP Components (use `requirements.txt` for this, which is intended to continue to be used).
 
 ***
 
