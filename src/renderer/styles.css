@@ -3089,3 +3089,27 @@ input:checked + .slider:before {
     opacity: 0.5;
     pointer-events: none;
 }
+
+/* --- Modality Tags --- */
+.modality-tag {
+    cursor: pointer;
+    padding: 8px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 9999px;
+    background-color: #ffffff;
+    color: #374151;
+    font-size: 0.875rem;
+    font-weight: 500;
+    transition: background-color 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.modality-tag:hover {
+    background-color: #f9fafb;
+    border-color: #9ca3af;
+}
+
+.modality-tag.selected {
+    background-color: #3b82f6;
+    color: #ffffff;
+    border-color: #3b82f6;
+}

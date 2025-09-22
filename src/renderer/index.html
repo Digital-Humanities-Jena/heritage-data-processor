@@ -822,9 +822,9 @@
                         <p id="chosenHdpcPathDisplay" class="font-mono bg-gray-100 p-2 rounded my-1 text-sm break-all"></p>
                     </div>
                     <div>
-                        <label for="newProjectModality" class="block text-sm font-medium text-gray-700">Modality Template:</label>
-                        <select id="newProjectModality" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white">
-                            </select>
+                        <label class="block text-sm font-medium text-gray-700">Modality Template:</label>
+                        <div id="newProjectModality" class="mt-1 flex flex-wrap gap-2">
+                            </div>
                     </div>
                 </div>
 
@@ -858,11 +858,30 @@
 
                 <div id="newProjectStep4" class="new-project-step hidden space-y-4">
                     <p class="text-sm text-gray-700">Configure file scanning for modality: <strong id="scanSettingsModality"></strong></p>
+                    
                     <div>
                         <label class="block text-sm font-medium text-gray-700">File Extensions to Scan:</label>
-                        <div id="fileExtensionCheckboxes" class="mt-2 space-y-2 border p-3 rounded-md max-h-32 overflow-y-auto">
-                            </div>
+                        <div id="fileExtensionCheckboxes" class="mt-2 border rounded-md max-h-48 overflow-y-auto">
+                            <!-- Checkboxes will be dynamically inserted here-->    
+                        </div>
                     </div>
+
+                    <!-- Bundling Options (Now at the correct level) -->
+                    <div id="bundlingOptionsContainer" class="space-y-3 pt-3 border-t">
+                        <h4 class="text-sm font-medium text-gray-700">Bundling Options:</h4>
+                        <label class="flex items-center">
+                            <input type="checkbox" id="bundleCongruentPatterns" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                            <span class="ml-2 text-sm text-gray-600">Bundle files with congruent filenames (Root Mode only)</span>
+                        </label>
+                        <div id="primarySourceFileContainer" class="space-y-1">
+                            <label for="primarySourceFileSelect" class="block text-sm font-medium text-gray-700">Primary Source File Extension:</label>
+                            <input type="text" id="primarySourceFileSearch" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="Search extensions...">
+                            <select id="primarySourceFileSelect" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm bg-white"></select>
+                            <p class="text-xs text-gray-500">Select the file extension that is the primary source for a bundle's metadata.</p>
+                        </div>
+                    </div>
+
+                    <!-- OBJ Specific Options (Will hide/show correctly) -->
                     <div id="objOptionsContainer" class="hidden space-y-3 pt-3 border-t">
                         <h4 class="text-sm font-medium text-gray-700">3D Model (OBJ) Options:</h4>
                         <label class="flex items-center">
@@ -876,18 +895,18 @@
                         <div id="textureSearchContainer" class="pt-2 space-y-2 opacity-50 transition-opacity">
                             <label class="block text-sm font-medium text-gray-700">Search for Texture Files in these directories:</label>
                             <div id="textureSearchDirsContainer" class="space-y-2">
-                                </div>
+                                <!-- Texture search directories will be inserted here -->
+                            </div>
                             <button type="button" id="addTextureDirBtn" class="btn-secondary text-xs py-1 px-2" disabled>
                                 Add Directory to search for Textures...
                             </button>
                         </div>
-                        <div id="bundlingOptionsContainer" class="space-y-3 pt-3 border-t">
-                            <h4 class="text-sm font-medium text-gray-700">Bundling Options:</h4>
+                        <div class="pt-3 border-t">
                             <label class="flex items-center">
                                 <input type="checkbox" id="archiveSubdirectories" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
                                 <span class="ml-2 text-sm text-gray-600">Archive files in subdirectories (e.g., textures) into a ZIP file</span>
                             </label>
-                            <p class="text-xs text-gray-500 -mt-2 ml-6">Recommended for complex models. This bundles all associated files from subdirectories into a single archive per model, preserving their directory structure.</p>
+                            <p class="text-xs text-gray-500 ml-6">Recommended for complex models.</p>
                         </div>
                     </div>
                 </div>

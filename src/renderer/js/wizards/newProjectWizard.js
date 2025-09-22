@@ -42,6 +42,10 @@ const textureSearchContainer = document.getElementById('textureSearchContainer')
 const textureSearchDirsContainer = document.getElementById('textureSearchDirsContainer');
 const addTextureDirBtn = document.getElementById('addTextureDirBtn');
 const archiveSubdirectories = document.getElementById('archiveSubdirectories');
+const bundlingOptionsContainer = document.getElementById('bundlingOptionsContainer');
+const bundleCongruentPatterns = document.getElementById('bundleCongruentPatterns');
+const primarySourceFileContainer = document.getElementById('primarySourceFileContainer');
+const primarySourceFileSelect = document.getElementById('primarySourceFileSelect');
 
 const newProjectStep5 = document.getElementById('newProjectStep5');
 const foundFilesListContainer = document.getElementById('foundFilesListContainer');
@@ -79,22 +83,26 @@ const MODALITY_OPTIONS = [
 function resetNewProjectWizard() {
     currentNewProjectStep = 1;
     newProjectData = {
-        projectName: '', shortCode: '', hdpcPath: '', modality: '', projectId: null,
+        projectName: '', shortCode: '', hdpcPath: '', modalities: [], projectId: null,
         dataInPath: '', dataOutPath: '', batchEntity: 'root', scanOptions: {}
     };
     if (newProjectNameInput) newProjectNameInput.value = '';
     if (newProjectShortCodeInput) newProjectShortCodeInput.value = '';
     if (suggestedHdpcFilenameEl) suggestedHdpcFilenameEl.textContent = 'project.hdpc';
+
     if (newProjectModalitySelect) {
-        newProjectModalitySelect.innerHTML = MODALITY_OPTIONS.map(m => `<option value="${m.key}">${m.label}</option>`).join('');
+        newProjectModalitySelect.innerHTML = MODALITY_OPTIONS.map(m => 
+            `<div class="modality-tag" data-value="${m.key}">${m.label}</div>`
+        ).join('');
     }
+
     if (newProjectDataInPathInput) newProjectDataInPathInput.value = '';
     if (newProjectDataOutPathInput) newProjectDataOutPathInput.value = '';
     if (newProjectStatus) newProjectStatus.textContent = '';
 }
 
 function updateObjOptionsVisibility() {
-    const is3DModel = newProjectData.modality === '3D Model';
+    const is3DModel = newProjectData.modalities.includes('3D Model');
     const objCheckbox = document.getElementById('ext-.obj');
     const isObjSelected = objCheckbox ? objCheckbox.checked : false;
 
@@ -102,12 +110,9 @@ function updateObjOptionsVisibility() {
         objOptionsContainer.classList.remove('hidden');
     } else {
         objOptionsContainer.classList.add('hidden');
-        // Reset the state of the remaining controls when the container is hidden
         addMtlFile.checked = false;
         addTextureFiles.checked = false;
         addTextureFiles.disabled = true;
-        
-        // Ensure the dependent UI state is also reset
         textureSearchContainer.style.opacity = '0.5';
         addTextureDirBtn.disabled = true;
         textureSearchDirsContainer.querySelectorAll('.user-added-dir').forEach(el => el.remove());
@@ -115,6 +120,24 @@ function updateObjOptionsVisibility() {
 
     if (archiveSubdirectories) {
         archiveSubdirectories.checked = true;
+    }
+}
+
+function updatePrimarySourceFileDropdown() {
+    const selectedExtensions = Array.from(fileExtensionCheckboxes.querySelectorAll('.file-ext-checkbox:checked')).map(cb => cb.value);
+    let optionsHTML = '<option value="">- None -</option>';
+    const savedPrimaryExt = newProjectData.scanOptions?.primary_source_ext;
+
+    optionsHTML += selectedExtensions.map(ext => 
+        `<option value="${ext}" ${savedPrimaryExt === ext ? 'selected' : ''}>${ext}</option>`
+    ).join('');
+
+    primarySourceFileSelect.innerHTML = optionsHTML;
+
+    // After populating, ensure the search term is re-applied if it exists
+    const primarySourceFileSearch = document.getElementById('primarySourceFileSearch');
+    if (primarySourceFileSearch && primarySourceFileSearch.value) {
+        primarySourceFileSearch.dispatchEvent(new Event('input'));
     }
 }
 
@@ -133,7 +156,7 @@ async function updateNewProjectWizardView() {
 
         case 2:
             if (newProjectStep2) newProjectStep2.classList.remove('hidden');
-            if (newProjectModalTitle) newProjectModalTitle.textContent = "Step 2: Select Data Modality";
+            if (newProjectModalTitle) newProjectModalTitle.textContent = "Step 2: Select Modality Templates";
             if (chosenHdpcPathDisplay) chosenHdpcPathDisplay.textContent = newProjectData.hdpcPath || 'Not selected';
             if (newProjectBackBtn) newProjectBackBtn.classList.remove('hidden');
             if (newProjectNextBtn) { newProjectNextBtn.classList.remove('hidden'); newProjectNextBtn.textContent = "Next: Configure Paths"; }
@@ -149,6 +172,15 @@ async function updateNewProjectWizardView() {
                 newProjectDataInPathInput.placeholder = `e.g., ${hdpcDir}${separator}Data${separator}${newProjectData.shortCode}${separator}Input`;
                 newProjectDataOutPathInput.placeholder = `e.g., ${hdpcDir}${separator}Data${separator}${newProjectData.shortCode}${separator}Output`;
             }
+            if (newProjectBatchEntitySelect) {
+                 newProjectBatchEntitySelect.innerHTML = `
+                    <option value="root">Root (each file for a separate Zenodo record)</option>
+                    <option value="subdirectory">Subdirectory (each subfolder becomes a separate Zenodo record)</option>
+                    <option value="hybrid">Hybrid (Root and Subdirectory)</option>
+                `;
+                // restore recently set state
+                newProjectBatchEntitySelect.value = newProjectData.batchEntity || 'root';
+            }
             if (newProjectBackBtn) newProjectBackBtn.classList.remove('hidden');
             if (newProjectNextBtn) { newProjectNextBtn.classList.remove('hidden'); newProjectNextBtn.textContent = "Next: Configure Scan Options"; }
             if (newProjectFinishBtn) newProjectFinishBtn.classList.add('hidden');
@@ -156,13 +188,12 @@ async function updateNewProjectWizardView() {
             
         case 4:
             if (newProjectStep4) newProjectStep4.classList.remove('hidden');
-            const selectedModality = MODALITY_OPTIONS.find(m => m.key === newProjectData.modality);
-            const modalityLabel = selectedModality ? selectedModality.label : newProjectData.modality;
+            const selectedModalities = newProjectData.modalities || [];
+            const modalityLabel = selectedModalities.join(' & ');
 
             if (newProjectModalTitle) newProjectModalTitle.textContent = `Step 4: File Scan Options for '${modalityLabel}'`;
             if (scanSettingsModality) scanSettingsModality.textContent = modalityLabel;
 
-            // This block populates the default input data directory when the view is shown
             textureSearchDirsContainer.innerHTML = '';
             const defaultDirDiv = document.createElement('div');
             defaultDirDiv.className = 'flex items-center gap-2';
@@ -173,25 +204,53 @@ async function updateNewProjectWizardView() {
                 </button>
             `;
             textureSearchDirsContainer.appendChild(defaultDirDiv);
-            
             try {
                 const response = await fetch(`${PYTHON_API_BASE_URL}/api/config/get`);
                 const configData = await response.json();
-                const filters = configData.configData.modality_file_filters[newProjectData.modality];
+                const allFilters = configData.configData.modality_file_filters;
+
                 fileExtensionCheckboxes.innerHTML = '';
-                if (filters && filters.accepted_extensions) {
-                    filters.accepted_extensions.forEach(ext => {
-                        const div = document.createElement('div');
-                        div.className = 'flex items-center';
-                        div.innerHTML = `
-                            <input id="ext-${ext}" type="checkbox" value="${ext}" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 file-ext-checkbox" checked>
-                            <label for="ext-${ext}" class="ml-2 text-sm text-gray-600">${ext}</label>
-                        `;
-                        fileExtensionCheckboxes.appendChild(div);
-                    });
-                }
-                fileExtensionCheckboxes.addEventListener('change', updateObjOptionsVisibility);
+
+                selectedModalities.forEach(modalityKey => {
+                    const filters = allFilters[modalityKey];
+                    if (filters && filters.accepted_extensions) {
+                        const details = document.createElement('details');
+                        details.className = 'modality-group p-2 border-b last:border-b-0';
+                        details.open = true; // Default to open
+                        
+                        const summary = document.createElement('summary');
+                        summary.className = 'font-semibold text-sm cursor-pointer';
+                        summary.textContent = modalityKey;
+                        details.appendChild(summary);
+
+                        const extensionGrid = document.createElement('div');
+                        extensionGrid.className = 'grid grid-cols-3 gap-2 mt-2 pl-4';
+                        
+                        filters.accepted_extensions.forEach(ext => {
+                            const isChecked = newProjectData.scanOptions?.extensions?.includes(ext) ?? true;
+                            const div = document.createElement('div');
+                            div.className = 'flex items-center';
+                            div.innerHTML = `
+                                <input id="ext-${ext}" type="checkbox" value="${ext}" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 file-ext-checkbox" ${isChecked ? 'checked' : ''}>
+                                <label for="ext-${ext}" class="ml-2 text-sm text-gray-600">${ext}</label>
+                            `;
+                            extensionGrid.appendChild(div);
+                        });
+                        details.appendChild(extensionGrid);
+                        fileExtensionCheckboxes.appendChild(details);
+                    }
+                });
+
+                // Re-attach the event listener after populating
+                fileExtensionCheckboxes.addEventListener('change', () => {
+                    updateObjOptionsVisibility();
+                    updatePrimarySourceFileDropdown();
+                });
+
+                // Manually trigger the update functions to set the initial state correctly
                 updateObjOptionsVisibility();
+                updatePrimarySourceFileDropdown();
+
             } catch (error) {
                 console.error("Could not load modality filters:", error);
                 fileExtensionCheckboxes.innerHTML = '<p class="text-red-500 text-sm">Could not load file extensions.</p>';
@@ -243,7 +302,11 @@ async function handleNewProjectNext() {
         currentNewProjectStep = 2;
 
     } else if (currentNewProjectStep === 2) {
-        newProjectData.modality = newProjectModalitySelect.value;
+        newProjectData.modalities = Array.from(document.querySelectorAll('#newProjectModality .modality-tag.selected')).map(tag => tag.dataset.value);
+        if (newProjectData.modalities.length === 0) {
+            if (newProjectStatus) newProjectStatus.textContent = "Please select at least one modality.";
+            return;
+        }
         currentNewProjectStep = 3;
 
     } else if (currentNewProjectStep === 3) {
@@ -263,8 +326,11 @@ async function handleNewProjectNext() {
             return;
         }
         const textureSearchPaths = Array.from(textureSearchDirsContainer.querySelectorAll('.texture-dir-path')).map(input => input.value);
+        
         newProjectData.scanOptions = {
             extensions: selectedExtensions,
+            primary_source_ext: primarySourceFileSelect.value,
+            bundle_congruent_patterns: bundleCongruentPatterns.checked,
             obj_options: {
                 add_mtl: addMtlFile.checked,
                 add_textures: addTextureFiles.checked,
@@ -378,6 +444,7 @@ function createFileRowHTML(file, level) {
     const iconMap = {
         source: '<svg class="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>',
         primary: '<svg class="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        primary_source: '<svg class="w-4 h-4 text-yellow-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>',
         secondary: '<svg class="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14z"></path></svg>',
         archive: '<svg class="w-4 h-4 text-indigo-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4m-4-4h4m-4 8h4m-7 0h.01M9 3h6a2 2 0 012 2v3H7V5a2 2 0 012-2z"></path></svg>',
         archived_file: '<svg class="w-4 h-4 text-indigo-400 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>'
@@ -385,29 +452,33 @@ function createFileRowHTML(file, level) {
     const icon = iconMap[file.type] || iconMap['source'];
 
     const statusClasses = {
-        "Valid": "text-green-600 hover:text-green-800",
-        "Invalid": "text-red-600 hover:text-red-800",
-        "Problems": "text-red-600 hover:text-red-800 font-bold",
-        "MTL Missing": "text-amber-600 hover:text-amber-800",
-        "Textures Missing": "text-amber-600 hover:text-amber-800",
-        "File Conflict": "text-purple-600 hover:text-purple-800 font-bold",
+        "Valid": "text-green-600 hover:text-green-800", "Invalid": "text-red-600 hover:text-red-800",
+        "Problems": "text-red-600 hover:text-red-800 font-bold", "MTL Missing": "text-amber-600 hover:text-amber-800",
+        "Textures Missing": "text-amber-600 hover:text-amber-800", "File Conflict": "text-purple-600 hover:text-purple-800 font-bold",
         "Pending": "text-blue-600 hover:text-blue-800"
     };
     const statusClass = statusClasses[file.status] || "text-gray-600";
-    
-    // The unique path is stored as an ID to look up in the cache later.
     const fileId = file.path; 
+    
+    const primarySourceTag = file.type === 'primary_source' 
+        ? `<span class="ml-2 text-xs font-semibold text-white bg-yellow-500 px-2 py-0.5 rounded-full">Primary Source</span>`
+        : '';
 
-    // Add archive info text if this is an archived file
     const archiveInfo = file.type === 'archived_file' 
         ? `<span class="ml-2 text-xs italic text-indigo-700">(archived in ${file.archive_name || 'archive.zip'})</span>`
         : '';
+    
+    const separator = file.path.includes('\\') ? '\\' : '/';
+    const pathParts = file.path.split(separator);
+    const parentDir = pathParts.length > 1 ? pathParts[pathParts.length - 2] : '';
+    const displayPath = parentDir ? `...${separator}${parentDir}${separator}${file.name}` : file.name;
 
     let rowHTML = `
         <div class="flex items-center py-1.5 text-sm">
             <div class="flex-grow flex items-center min-w-0" style="padding-left: ${indent}px;">
                 ${icon}
-                <span class="text-gray-800 truncate" title="${file.path}">${file.name}</span>
+                <span class="text-gray-800 truncate" title="${file.path}">${displayPath}</span>
+                ${primarySourceTag} 
                 ${archiveInfo}
             </div>
             <div class="w-24 text-center flex-shrink-0">
@@ -446,8 +517,17 @@ function renderFoundFilesList(files) {
     }
 
     files.forEach(populateCache);
+
+    // Wrap each bundle / record in a styled container
+    const bundlesHTML = files.map(file => {
+        return `
+            <div class="file-bundle border-b-2 border-gray-200 last:border-b-0 py-2">
+                ${createFileRowHTML(file, 0)}
+            </div>
+        `;
+    }).join('');
     
-    foundFilesListContainer.innerHTML = files.map(file => createFileRowHTML(file, 0)).join('');
+    foundFilesListContainer.innerHTML = bundlesHTML;
 }
 
 /**
@@ -546,6 +626,14 @@ export function initNewProjectWizard() {
     if (newProjectBackBtn) newProjectBackBtn.addEventListener('click', handleNewProjectBack);
     if (newProjectFinishBtn) newProjectFinishBtn.addEventListener('click', handleNewProjectFinish);
 
+    if (newProjectModalitySelect) {
+        newProjectModalitySelect.addEventListener('click', (e) => {
+            if (e.target.classList.contains('modality-tag')) {
+                e.target.classList.toggle('selected');
+            }
+        });
+    }
+
     if (newProjectShortCodeInput) {
         newProjectShortCodeInput.addEventListener('input', () => {
             const code = newProjectShortCodeInput.value.trim();
@@ -569,6 +657,13 @@ export function initNewProjectWizard() {
         browseDataOutPathBtn.addEventListener('click', async () => {
             const path = await window.electronAPI.openDirectory();
             if (path) newProjectDataOutPathInput.value = path;
+        });
+    }
+
+    if (fileExtensionCheckboxes) {
+        fileExtensionCheckboxes.addEventListener('change', () => {
+            updateObjOptionsVisibility();
+            updatePrimarySourceFileDropdown();
         });
     }
 
@@ -636,5 +731,49 @@ export function initNewProjectWizard() {
     }
     if (closeFileStatusModalFooterBtn) {
         closeFileStatusModalFooterBtn.addEventListener('click', () => fileStatusModal.classList.add('hidden'));
+    }
+
+    const primarySourceFileSearch = document.getElementById('primarySourceFileSearch');
+    if (primarySourceFileSearch) {
+        primarySourceFileSearch.addEventListener('input', () => {
+            const searchTerm = primarySourceFileSearch.value.toLowerCase().replace('.', '');
+            const options = primarySourceFileSelect.options;
+            let visibleOptionsCount = 0;
+            for (let i = 0; i < options.length; i++) {
+                const option = options[i];
+                const optionText = option.text.toLowerCase();
+                const isVisible = option.value === "" || optionText.includes(searchTerm);
+                option.style.display = isVisible ? '' : 'none';
+                if (isVisible) visibleOptionsCount++;
+            }
+            if (searchTerm) {
+                primarySourceFileSelect.size = Math.max(2, Math.min(visibleOptionsCount, 5));
+            } else {
+                primarySourceFileSelect.size = 1; 
+            }
+        });
+
+        primarySourceFileSearch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                for (let i = 0; i < primarySourceFileSelect.options.length; i++) {
+                    const option = primarySourceFileSelect.options[i];
+                    if (option.style.display !== 'none' && option.value !== "") {
+                        primarySourceFileSelect.value = option.value;
+                        primarySourceFileSearch.value = option.value;
+                        primarySourceFileSelect.size = 1; // Collapse the list
+                        break;
+                    }
+                }
+            }
+        });
+        
+        primarySourceFileSelect.addEventListener('blur', () => {
+            primarySourceFileSelect.size = 1;
+        });
+        primarySourceFileSelect.addEventListener('change', () => {
+            primarySourceFileSearch.value = primarySourceFileSelect.value;
+            primarySourceFileSelect.size = 1; // Collapse on selection
+        });
     }
 }

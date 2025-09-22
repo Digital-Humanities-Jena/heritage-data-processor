@@ -1106,26 +1106,74 @@ def get_uploads_by_tab_route():
 
 @zenodo_bp.route("/project/metadata/load_file_preview", methods=["POST"])
 def route_load_metadata_file_preview():
+    # Validate request data
     data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "error": "Invalid JSON request"}), 400
+
     file_path_str = data.get("filePath")
     file_format = data.get("fileFormat", "csv")
 
-    if not file_path_str or not Path(file_path_str).is_file():
+    # Validate file path
+    if not file_path_str:
+        return jsonify({"success": False, "error": "File path is required"}), 400
+
+    file_path = Path(file_path_str)
+    if not file_path.is_file():
         return jsonify({"success": False, "error": "File not found"}), 400
 
     try:
+        # Load file based on format
         if file_format == "csv":
-            df = pd.read_csv(Path(file_path_str))
+            df = pd.read_csv(file_path, encoding="utf-8", encoding_errors="replace")
         elif file_format == "excel":
-            df = pd.read_excel(Path(file_path_str))
+            try:
+                df = pd.read_excel(file_path, engine="openpyxl")
+            except ImportError:
+                return (
+                    jsonify(
+                        {
+                            "success": False,
+                            "error": "Excel support not available. Install openpyxl: pip install openpyxl",
+                        }
+                    ),
+                    400,
+                )
         else:
-            return jsonify({"success": False, "error": "Unsupported file format."}), 400
+            return jsonify({"success": False, "error": "Unsupported file format"}), 400
 
+        # Get columns
         columns = list(df.columns)
-        preview_data = df.head(5).to_dict(orient="records")
+
+        # Prepare preview data with proper JSON serialization
+        preview_df = df.head(5).copy()
+
+        # Convert problematic data types to JSON-serializable formats
+        preview_df = preview_df.fillna("")  # Replace NaN with empty strings
+
+        # Convert datetime columns to strings
+        for col in preview_df.columns:
+            if pd.api.types.is_datetime64_any_dtype(preview_df[col]):
+                preview_df[col] = preview_df[col].astype(str)
+            elif pd.api.types.is_numeric_dtype(preview_df[col]):
+                # Handle infinity values
+                preview_df[col] = preview_df[col].replace([float("inf"), float("-inf")], "")
+
+        preview_data = preview_df.to_dict(orient="records")
 
         return jsonify({"success": True, "columns": columns, "previewData": preview_data, "rowCount": len(df)})
+
+    except UnicodeDecodeError as e:
+        return (
+            jsonify({"success": False, "error": f"File encoding error. Try saving the file as UTF-8: {str(e)}"}),
+            400,
+        )
+    except pd.errors.EmptyDataError:
+        return jsonify({"success": False, "error": "File is empty"}), 400
+    except pd.errors.ParserError as e:
+        return jsonify({"success": False, "error": f"File parsing error. Check file format: {str(e)}"}), 400
     except Exception as e:
+        current_app.logger.error(f"Error loading file {file_path}: {str(e)}")
         return jsonify({"success": False, "error": f"Error loading file: {str(e)}"}), 500
 
 

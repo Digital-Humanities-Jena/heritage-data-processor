@@ -447,6 +447,7 @@ function createFileBundleNodeHTML(fileNode, level) {
     const iconMap = {
         source: '<svg class="w-4 h-4 text-blue-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>',
         primary: '<svg class="w-4 h-4 text-green-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>',
+        primary_source: '<svg class="w-4 h-4 text-yellow-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"></path></svg>',
         secondary: '<svg class="w-4 h-4 text-gray-500 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14z"></path></svg>',
         archive: '<svg class="w-4 h-4 text-indigo-600 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4m-4-4h4m-4 8h4m-7 0h.01M9 3h6a2 2 0 012 2v3H7V5a2 2 0 012-2z"></path></svg>',
         archived_file: '<svg class="w-4 h-4 text-indigo-400 mr-2 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path></svg>'
@@ -463,10 +464,14 @@ function createFileBundleNodeHTML(fileNode, level) {
         "Pending": "text-blue-600 hover:text-blue-800"
     };
     const statusClass = statusClasses[fileNode.status] || "text-gray-600";
+    
+    const primarySourceTag = fileNode.file_type === 'primary_source' 
+        ? `<span class="ml-2 text-xs font-semibold text-white bg-yellow-500 px-2 py-0.5 rounded-full">Primary Source</span>`
+        : '';
 
     // Add archive info text if this is an archived file
-    const archiveInfo = fileNode.type === 'archived_file' 
-        ? `<span class="ml-2 text-xs italic text-indigo-700">(archived)</span>` // We don't know the archive name from this context, but this is enough
+    const archiveInfo = fileNode.file_type === 'archived_file' 
+        ? `<span class="ml-2 text-xs italic text-indigo-700">(archived)</span>`
         : '';
 
     let rowHTML = `
@@ -474,6 +479,7 @@ function createFileBundleNodeHTML(fileNode, level) {
             <div class="flex-grow flex items-center min-w-0" style="padding-left: ${indent}px;">
                 ${icon}
                 <span class="text-gray-800 truncate" title="${fileNode.absolute_path}">${fileNode.filename}</span>
+                ${primarySourceTag}
                 ${archiveInfo}
             </div>
             <div class="w-24 text-center flex-shrink-0">

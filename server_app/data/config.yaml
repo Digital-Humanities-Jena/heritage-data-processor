@@ -87,6 +87,10 @@ modality_file_filters:
       - .stl
       - .fbx
       - .ply
+      - .usdz
+      - .3ds
+      - .dae
+      - .blend
     default_filter_name: 3D Models
     description: Defines accepted extensions for 3D model files.
     extensions_label: Accepted 3D Model Extensions

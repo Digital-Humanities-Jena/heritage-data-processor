@@ -115,6 +115,9 @@ tables:
         type: DATETIME
       - name: error_message
         type: TEXT
+      - name: is_primary_source
+        type: INTEGER
+        constraints: [NOT NULL, DEFAULT 0]
       - name: generated_by_pipeline_step_id
         type: INTEGER
         constraints: [NULLABLE]
@@ -497,5 +500,5 @@ tables:
 
 # --- Schema Version ---
 schema_info:
-  version: "0.1.0"
+  version: "0.1.1"
   description: "Enhanced schema for Heritage Data Processor Container with metadata mapping and file relationship support"

@@ -105,25 +105,24 @@ def create_and_scan_project_route():
     """
     Handles the entire new project creation process: creates the .hdpc file,
     saves all initial configuration, performs a hierarchical file scan, validates
-    each file, and determines its status.
+    each file, archives assets if needed, and determines its status.
     """
     data = request.get_json()
     project_name = data.get("projectName")
     short_code = data.get("shortCode")
     hdpc_path_str = data.get("hdpcPath")
-    modality = data.get("modality")
-    scan_options = data.get("scanOptions")
+    modalities = data.get("modalities", [])
+    scan_options = data.get("scanOptions", {})
     data_in_path_str = data.get("dataInPath")
     data_out_path_str = data.get("dataOutPath")
     batch_entity = data.get("batchEntity")
 
-    # 1. Validate incoming data
     if not all(
         [
             project_name,
             short_code,
             hdpc_path_str,
-            modality,
+            modalities,
             scan_options,
             data_in_path_str,
             data_out_path_str,
@@ -134,6 +133,7 @@ def create_and_scan_project_route():
 
     hdpc_path = Path(hdpc_path_str)
     data_in_path = Path(data_in_path_str).resolve()
+    data_out_path = Path(data_out_path_str).resolve()
 
     if not data_in_path.is_dir():
         return (
@@ -144,7 +144,6 @@ def create_and_scan_project_route():
     if hdpc_path.exists():
         hdpc_path.unlink()
 
-    # 2. Create the database from the schema file
     config_dir = Path(current_app.config["CONFIG_FILE_PATH"]).parent
     schema_path = config_dir / "hdpc_schema.yaml"
     schema_created, schema_version = create_hdpc_database(hdpc_path, schema_path)
@@ -154,7 +153,6 @@ def create_and_scan_project_route():
     validator = FileValidator()
     conn = None
     try:
-        # 3. Use a SINGLE connection for all subsequent operations
         conn = sqlite3.connect(hdpc_path)
         cursor = conn.cursor()
         cursor.execute("BEGIN TRANSACTION;")
@@ -167,9 +165,9 @@ def create_and_scan_project_route():
         project_id = cursor.lastrowid
 
         config_values = [
-            (project_id, "core.modality", modality, "Modality Template"),
-            (project_id, "paths.data_in", str(data_in_path.resolve()), "Input data directory"),
-            (project_id, "paths.data_out", str(Path(data_out_path_str).resolve()), "Output data directory"),
+            (project_id, "core.modality", json.dumps(modalities), "Modality Template"),
+            (project_id, "paths.data_in", str(data_in_path), "Input data directory"),
+            (project_id, "paths.data_out", str(data_out_path), "Output data directory"),
             (project_id, "core.batch_entity", batch_entity, "File processing mode"),
         ]
         cursor.executemany(
@@ -178,269 +176,291 @@ def create_and_scan_project_route():
         )
         cursor.execute(
             "INSERT INTO file_scan_settings (project_id, modality, scan_options) VALUES (?, ?, ?)",
-            (project_id, modality, json.dumps(scan_options)),
+            (project_id, json.dumps(modalities), json.dumps(scan_options)),
         )
 
-        # 4. Scan for files, validate, and prepare for response and DB insert
         files_added_count = 0
         extensions_to_scan = scan_options.get("extensions", [])
+        primary_source_ext = scan_options.get("primary_source_ext")
+        bundle_congruent = scan_options.get("bundle_congruent_patterns", False)
         found_files_for_response = []
         processed_paths = set()
 
         if extensions_to_scan:
-            for file_p in data_in_path.rglob("*"):
-                if not file_p.is_file() or str(file_p.resolve()) in processed_paths:
+            file_groups = {}
+            if batch_entity == "root":
+                if bundle_congruent:
+                    for file_p in data_in_path.glob("*"):
+                        if file_p.is_file() and any(
+                            file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
+                        ):
+                            group_key = file_p.stem
+                            file_groups.setdefault(group_key, []).append(file_p)
+                else:
+                    for file_p in data_in_path.glob("*"):
+                        if file_p.is_file() and any(
+                            file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
+                        ):
+                            file_groups[str(file_p)] = [file_p]
+            elif batch_entity == "subdirectory":
+                for subdir in data_in_path.iterdir():
+                    if subdir.is_dir():
+                        group_key = str(subdir.resolve())
+                        files_in_dir = []
+                        for file_p in subdir.rglob("*"):
+                            if file_p.is_file() and any(
+                                file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
+                            ):
+                                files_in_dir.append(file_p)
+                        if files_in_dir:
+                            file_groups[group_key] = files_in_dir
+            elif batch_entity == "hybrid":
+                # First, handle files in the root directory just like in 'root' mode
+                if bundle_congruent:
+                    for file_p in data_in_path.glob("*"):
+                        if file_p.is_file() and any(
+                            file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
+                        ):
+                            group_key = file_p.stem
+                            file_groups.setdefault(group_key, []).append(file_p)
+                else:
+                    for file_p in data_in_path.glob("*"):
+                        if file_p.is_file() and any(
+                            file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
+                        ):
+                            file_groups[str(file_p)] = [file_p]
+
+                # Next, handle files in subdirectories just like in 'subdirectory' mode
+                for subdir in data_in_path.iterdir():
+                    if subdir.is_dir():
+                        group_key = str(subdir.resolve())
+                        files_in_dir = []
+                        for file_p in subdir.rglob("*"):
+                            if file_p.is_file() and any(
+                                file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
+                            ):
+                                files_in_dir.append(file_p)
+                        if files_in_dir:
+                            file_groups[group_key] = files_in_dir
+
+            for group_key, files_in_group in file_groups.items():
+                if not files_in_group:
                     continue
 
-                if any(file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan):
-                    if file_p.name.lower().endswith(".obj") and scan_options.get("obj_options", {}).get("add_mtl"):
-                        file_structure = find_associated_files(file_p, scan_options)
-                    else:
-                        file_structure = {
-                            "name": file_p.name,
-                            "path": str(file_p.resolve()),
-                            "type": "source",
-                            "children": [],
-                        }
+                primary_source_file = next(
+                    (
+                        f
+                        for f in files_in_group
+                        if primary_source_ext and f.name.lower().endswith(primary_source_ext.lower())
+                    ),
+                    files_in_group[0],
+                )
+                obj_file_in_group = next((f for f in files_in_group if f.name.lower().endswith(".obj")), None)
 
-                    # --- Archive Logic ---
-                    obj_options = scan_options.get("obj_options", {})
-                    # If archiving is requested, transform the file structure before validation
-                    if obj_options.get("archive_subdirectories"):
+                # The main file for scanning is the OBJ if it exists, otherwise the designated primary file.
+                main_scan_file = obj_file_in_group if obj_file_in_group else primary_source_file
+                file_structure = find_associated_files(main_scan_file, scan_options)
 
-                        # Define a helper to process nodes recursively
-                        def process_archiving_for_node(node):
-                            """
-                            Recursively finds texture files and groups ALL of them into a single zip archive node.
-                            This MODIFIES the 'node' (file_structure) in-place.
-                            """
-                            if not node or not node.get("children"):
+                # Helper to get all paths already in the structure
+                def get_all_paths(node):
+                    paths = {str(Path(node["path"]).resolve())}
+                    for child in node.get("children", []):
+                        paths.update(get_all_paths(child))
+                    return paths
+
+                paths_in_structure = get_all_paths(file_structure)
+
+                # Add remaining files from the group to the structure
+                for file_in_group in files_in_group:
+                    if str(file_in_group.resolve()) not in paths_in_structure:
+                        file_structure["children"].append(
+                            {
+                                "name": file_in_group.name,
+                                "path": str(file_in_group.resolve()),
+                                "type": "source",
+                                "children": [],
+                            }
+                        )
+
+                # Now, correctly identify and mark the primary source within the structure
+                for node in [file_structure] + file_structure.get("children", []):
+                    if Path(node["path"]).resolve() == primary_source_file.resolve():
+                        node["type"] = "primary_source"
+                        break
+
+                # --- ARCHIVAL LOGIC ---
+                if scan_options.get("obj_options", {}).get("archive_subdirectories"):
+
+                    def process_archiving_for_node(node, base_dir_for_relative_paths, group_key):
+                        # First, recurse to handle any nested archiving possibilities
+                        if node.get("children"):
+                            for child_node in node["children"]:
+                                process_archiving_for_node(child_node, base_dir_for_relative_paths, group_key)
+
+                        # Then, process the current node
+                        if node.get("type") == "primary":
+                            files_to_archive, other_children = [], []
+                            for tex_node in node.get("children", []):
+                                if tex_node.get("type") == "secondary":
+                                    tex_path = Path(tex_node["path"])
+                                    # Use the consistent base directory for relative path calculation
+                                    archive_name = tex_path.relative_to(base_dir_for_relative_paths)
+                                    tex_node["type"] = "archived_file"
+                                    files_to_archive.append((tex_node, archive_name))
+                                else:
+                                    other_children.append(tex_node)
+
+                            if not files_to_archive:
                                 return
 
-                            # Recurse first to process children
-                            for child_node in node.get("children", []):
-                                process_archiving_for_node(child_node)
+                            archive_dir = data_out_path / "archives"
+                            archive_dir.mkdir(parents=True, exist_ok=True)
 
-                            # After recursion, check if this node is a primary MTL file
-                            if node.get("type") == "primary":
-                                # This is an MTL file. Process ALL its texture children.
-                                base_dir = Path(node["path"]).parent
-                                files_to_archive = []
-                                other_children = []  # e.g., anything not a texture
-
-                                for tex_node in node.get("children", []):
-                                    if tex_node.get("type") != "secondary":
-                                        other_children.append(tex_node)  # Not a texture, leave it
-                                        continue
-
-                                    tex_path = Path(tex_node["path"])
-                                    archive_name_path = None
-
-                                    if tex_path.parent == base_dir:
-                                        # It's a LOCAL texture. Its archive path is just its filename.
-                                        archive_name_path = Path(tex_path.name)
-                                    else:
-                                        # It's a REMOTE texture. Preserve its relative subdir path.
-                                        try:
-                                            archive_name_path = tex_path.relative_to(base_dir)
-                                        except ValueError:
-                                            # Fallback: Path isn't relative, just use filename.
-                                            archive_name_path = Path(tex_path.name)
-
-                                    # Mark this node as archived
-                                    tex_node["type"] = "archived_file"
-                                    files_to_archive.append((tex_node, archive_name_path))
-
-                                if not files_to_archive:
-                                    return  # No textures found to archive
-
-                                # We have textures, let's create ONE zip
-                                new_zip_nodes = []
-                                archive_dir = Path(data_out_path_str) / "archives"
-                                archive_dir.mkdir(parents=True, exist_ok=True)
-
-                                # Find the parent OBJ's name (which is the 'node' in the outer function scope)
-                                base_obj_name_stem = Path(
-                                    file_structure["name"]  # Use 'file_structure' from outer scope
-                                ).stem
-
-                                # --- Determine ZIP Filename ---
-                                # Default suffix
-                                archive_suffix = "_assets"
-
-                                # Check the paths of files being archived.
-                                # 'archive_name_path' (the 2nd item in the tuple) holds the relative path for the zip.
-                                # e.g., 'local_map.png' (parent is '.') or 'textures/map.png' (parent is 'textures')
-                                for _, archive_relative_path in files_to_archive:
-                                    if archive_relative_path.parent != Path("."):
-                                        # This file is in a subdirectory.
-                                        # Get the name of the *first* directory in its path.
-                                        # e.g., for 'textures/map.png', .parts is ('textures', 'map.png'). We want 'textures'.
-                                        first_subdir_name = archive_relative_path.parts[0]
-                                        archive_suffix = f"_{first_subdir_name}"
-                                        break
-
-                                zip_filename = f"{base_obj_name_stem}{archive_suffix}.zip"  # e.g., test_model_textures.zip or test_model_assets.zip
-                                zip_filepath = archive_dir / zip_filename
-                                archived_file_nodes = []  # Virtual children of the zip node
-
-                                try:
-                                    with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zip_f:
-                                        for tex_node, archive_name in files_to_archive:
-                                            # archive_name is the relative path (e.g., "textures/map.png" or "local_map.png")
-                                            zip_f.write(Path(tex_node["path"]), arcname=str(archive_name))
-                                            tex_node["archive_name"] = zip_filename  # Add this property for the UI
-                                            archived_file_nodes.append(tex_node)  # Add the node itself as a child
-
-                                    # Create a new "archive" node for the zip file
-                                    zip_validation_report = validator.validate(zip_filepath)  # Validate the new zip
-                                    new_zip_nodes.append(
-                                        {
-                                            "name": zip_filename,
-                                            "path": str(zip_filepath.resolve()),
-                                            "type": "archive",  # A new type for our UI to detect
-                                            "status": "Valid" if zip_validation_report["is_valid"] else "Invalid",
-                                            "validation_report": zip_validation_report,
-                                            "children": archived_file_nodes,  # The textures are children of the zip
-                                        }
-                                    )
-                                except Exception as e:
-                                    logger.error(f"Failed to create zip archive {zip_filename}: {e}")
-
-                                # Replace the MTL's children with: other non-texture children + the new zip archive node
-                                node["children"] = other_children + new_zip_nodes
-
-                        # Call the new archiving function on the file structure
-                        process_archiving_for_node(file_structure)
-
-                    # Validate every file in the hierarchy and set its status
-                    def validate_and_set_status(file_node):
-                        node_path = Path(file_node["path"])
-                        validation_report = validator.validate(node_path)
-                        file_node["validation_report"] = validation_report
-
-                        is_invalid = not validation_report["is_valid"]
-                        mtl_missing = False
-                        textures_missing = False
-                        has_conflicts = False
-                        obj_options = scan_options.get("obj_options", {})
-
-                        # Check for missing MTL (primary child) for source OBJ files
-                        if (
-                            file_node["type"] == "source"
-                            and node_path.name.lower().endswith(".obj")
-                            and obj_options.get("add_mtl")
-                        ):
-                            if not any(child["type"] == "primary" for child in file_node["children"]):
-                                mtl_missing = True
-                                validation_report["errors"].insert(
-                                    0, "File Warning: The referenced MTL file was not found in the same directory."
-                                )
-
-                        if file_node["type"] == "primary" and obj_options.get("add_textures"):
-                            missing_textures_list = file_node.get("missing_textures", [])
-                            if missing_textures_list:
-                                textures_missing = True
-                                validation_report["missing_textures"] = missing_textures_list
-                                error_msg = f"File Warning: Found {len(file_node['children'])} of {len(file_node['children']) + len(missing_textures_list)} referenced texture files."
-                                validation_report["errors"].insert(0, error_msg)
-
-                            conflicts_list = file_node.get("conflicts", [])
-                            if conflicts_list:
-                                has_conflicts = True
-                                validation_report["conflicts"] = conflicts_list
-                                error_msg = "File Conflict: Could not resolve texture paths due to multiple non-identical files being found."
-                                validation_report["errors"].insert(0, error_msg)
-
-                        # Set final status based on priority
-                        if has_conflicts:
-                            file_node["status"] = "File Conflict"
-                        elif is_invalid and (mtl_missing or textures_missing):
-                            file_node["status"] = "Problems"
-                        elif is_invalid:
-                            file_node["status"] = "Invalid"
-                        elif mtl_missing:
-                            file_node["status"] = "MTL Missing"
-                        elif textures_missing:
-                            file_node["status"] = "Textures Missing"
-                        else:
-                            file_node["status"] = "Valid"
-
-                        # Recurse
-                        for child in file_node.get("children", []):
-                            validate_and_set_status(child)
-
-                    validate_and_set_status(file_structure)
-                    found_files_for_response.append(file_structure)
-
-                    def insert_files_recursively(file_node, parent_id=None):
-                        nonlocal files_added_count
-                        node_path = Path(file_node["path"])
-                        abs_path_str = str(node_path.resolve())
-
-                        # Prepare data from the in-memory node (which has the correct types from the archiver)
-                        validation_report_json = json.dumps(file_node.get("validation_report"))
-                        file_type = file_node["type"]
-                        status = file_node["status"]
-
-                        # This function is stateless and queries the DB directly to decide its action.
-                        # This makes it immune to the rglob race condition.
-                        cursor.execute("SELECT file_id FROM source_files WHERE absolute_path = ?", (abs_path_str,))
-                        existing_row = cursor.fetchone()
-
-                        if existing_row:
-                            # --- UPDATE PATH ---
-                            # This file was already added to the DB (e.g., as a standalone file).
-                            existing_file_id = existing_row[0]
-
-                            cursor.execute(
-                                """UPDATE source_files 
-                                   SET parent_file_id = ?, file_type = ?, status = ?, error_message = ?
-                                   WHERE file_id = ?""",
-                                (parent_id, file_type, status, validation_report_json, existing_file_id),
+                            # --- Create a unique base_stem from the group_key ---
+                            # In subdirectory mode, group_key is the dir path, so its name is unique ("model_one", "model_two")
+                            base_stem = (
+                                Path(group_key).name
+                                if batch_entity in ["subdirectory", "hybrid"]
+                                else Path(file_structure["name"]).stem
                             )
-                            # Use the ID that was just updated as the parent for recursion
-                            current_node_db_id = existing_file_id
 
-                        else:
-                            # --- INSERT PATH ---
-                            # This is a new file (OBJ, MTL, ZIP, or an OBJ-first texture).
-                            # Added to processed_paths to prevent the outer rglob loop from processing it again.
-                            try:
-                                rel_path_str = str(node_path.relative_to(data_in_path))
-                            except ValueError:
-                                rel_path_str = str(node_path.relative_to(Path(data_out_path_str)))
+                            # Determine a logical suffix for the archive
+                            archive_suffix = "_assets"
+                            if files_to_archive:
+                                first_rel_path = files_to_archive[0][1]
+                                if first_rel_path.parent != Path("."):
+                                    archive_suffix = f"_{first_rel_path.parts[0]}"
 
-                            cursor.execute(
-                                """INSERT INTO source_files 
-                                   (project_id, absolute_path, relative_path, filename, size_bytes, 
-                                    sha256_hash, mime_type, file_type, status, error_message, 
-                                    added_timestamp, parent_file_id) 
-                                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
-                                (
-                                    project_id,
-                                    abs_path_str,
-                                    rel_path_str,
-                                    node_path.name,
-                                    node_path.stat().st_size if node_path.exists() else 0,
-                                    calculate_file_hash(node_path) if node_path.is_file() else None,
-                                    get_file_mime_type(node_path),
-                                    file_type,
-                                    status,
-                                    validation_report_json,
-                                    datetime.now(timezone.utc).isoformat(),
-                                    parent_id,
-                                ),
+                            zip_filename = f"{base_stem}{archive_suffix}.zip"
+                            zip_filepath = archive_dir / zip_filename
+
+                            archived_nodes = []
+                            with zipfile.ZipFile(zip_filepath, "w", zipfile.ZIP_DEFLATED) as zf:
+                                for tex_node, arc_name in files_to_archive:
+                                    zf.write(Path(tex_node["path"]), arcname=str(arc_name))
+                                    tex_node["archive_name"] = zip_filename
+                                    archived_nodes.append(tex_node)
+
+                            zip_report = validator.validate(zip_filepath)
+                            zip_node = {
+                                "name": zip_filename,
+                                "path": str(zip_filepath.resolve()),
+                                "type": "archive",
+                                "status": "Valid" if zip_report["is_valid"] else "Invalid",
+                                "validation_report": zip_report,
+                                "children": archived_nodes,
+                            }
+                            # Reconstruct the children list for the MTL file
+                            node["children"] = other_children + [zip_node]
+
+                    # Define the base directory from the main scan file *before* calling the recursive function
+                    base_dir = main_scan_file.parent
+                    process_archiving_for_node(file_structure, base_dir, group_key)
+
+                def validate_and_set_status(file_node):
+                    node_path = Path(file_node["path"])
+                    validation_report = validator.validate(node_path)
+                    file_node["validation_report"] = validation_report
+                    is_invalid = not validation_report["is_valid"]
+                    mtl_missing, textures_missing, has_conflicts = False, False, False
+                    obj_options = scan_options.get("obj_options", {})
+                    if (
+                        file_node["type"] in ["source", "primary_source"]
+                        and node_path.name.lower().endswith(".obj")
+                        and obj_options.get("add_mtl")
+                    ):
+                        if not any(child["type"] == "primary" for child in file_node["children"]):
+                            mtl_missing = True
+                            validation_report["errors"].insert(
+                                0, "File Warning: The referenced MTL file was not found in the same directory."
                             )
-                            files_added_count += 1
-                            processed_paths.add(abs_path_str)  # Add to set to prevent outer rglob loop
-                            current_node_db_id = cursor.lastrowid
+                    if file_node["type"] == "primary" and obj_options.get("add_textures"):
+                        missing_textures_list = file_node.get("missing_textures", [])
+                        if missing_textures_list:
+                            textures_missing = True
+                            validation_report["missing_textures"] = missing_textures_list
+                            error_msg = f"File Warning: Found {len(file_node['children'])} of {len(file_node['children']) + len(missing_textures_list)} referenced texture files."
+                            validation_report["errors"].insert(0, error_msg)
+                        conflicts_list = file_node.get("conflicts", [])
+                        if conflicts_list:
+                            has_conflicts = True
+                            validation_report["conflicts"] = conflicts_list
+                            error_msg = "File Conflict: Could not resolve texture paths due to multiple non-identical files being found."
+                            validation_report["errors"].insert(0, error_msg)
+                    if has_conflicts:
+                        file_node["status"] = "File Conflict"
+                    elif is_invalid and (mtl_missing or textures_missing):
+                        file_node["status"] = "Problems"
+                    elif is_invalid:
+                        file_node["status"] = "Invalid"
+                    elif mtl_missing:
+                        file_node["status"] = "MTL Missing"
+                    elif textures_missing:
+                        file_node["status"] = "Textures Missing"
+                    else:
+                        file_node["status"] = "Valid"
+                    for child in file_node.get("children", []):
+                        validate_and_set_status(child)
 
-                        # Recurse into children, passing this node's DB ID as the new parent_id
-                        for child_node in file_node.get("children", []):
-                            insert_files_recursively(child_node, current_node_db_id)
+                def process_and_insert_recursively(file_node, parent_id=None):
+                    nonlocal files_added_count
+                    node_path = Path(file_node["path"])
+                    abs_path_str = str(node_path.resolve())
 
-                    insert_files_recursively(file_structure)
+                    try:
+                        rel_path_str = str(node_path.relative_to(data_in_path))
+                    except ValueError:
+                        try:
+                            rel_path_str = str(node_path.relative_to(data_out_path))
+                        except ValueError:
+                            rel_path_str = node_path.name
+                    file_node["relative_path"] = rel_path_str
+
+                    validate_and_set_status(file_node)
+
+                    is_primary = 1 if file_node.get("type") == "primary_source" else 0
+                    file_node["is_primary_source"] = bool(is_primary)
+                    validation_report_json = json.dumps(file_node.get("validation_report"))
+                    file_type = file_node["type"]
+                    status = file_node["status"]
+
+                    cursor.execute("SELECT file_id FROM source_files WHERE absolute_path = ?", (abs_path_str,))
+                    existing_row = cursor.fetchone()
+
+                    if existing_row:
+                        current_node_db_id = existing_row[0]
+                        cursor.execute(
+                            """UPDATE source_files SET parent_file_id = ?, file_type = ?, status = ?, error_message = ?, is_primary_source = ? WHERE file_id = ?""",
+                            (parent_id, file_type, status, validation_report_json, is_primary, current_node_db_id),
+                        )
+                    else:
+                        cursor.execute(
+                            """INSERT INTO source_files (project_id, absolute_path, relative_path, filename, size_bytes, sha256_hash, mime_type, file_type, status, error_message, added_timestamp, parent_file_id, is_primary_source) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                            (
+                                project_id,
+                                abs_path_str,
+                                rel_path_str,
+                                node_path.name,
+                                node_path.stat().st_size if node_path.exists() else 0,
+                                calculate_file_hash(node_path) if node_path.is_file() else None,
+                                get_file_mime_type(node_path),
+                                file_type,
+                                status,
+                                validation_report_json,
+                                datetime.now(timezone.utc).isoformat(),
+                                parent_id,
+                                is_primary,
+                            ),
+                        )
+                        files_added_count += 1
+                        processed_paths.add(abs_path_str)
+                        current_node_db_id = cursor.lastrowid
+
+                    for child_node in file_node.get("children", []):
+                        process_and_insert_recursively(child_node, current_node_db_id)
+
+                process_and_insert_recursively(file_structure)
+                found_files_for_response.append(file_structure)
 
         conn.commit()
         return (
@@ -461,7 +481,8 @@ def create_and_scan_project_route():
             conn.rollback()
         if hdpc_path.exists():
             hdpc_path.unlink()
-        return jsonify({"success": False, "error": f"An unexpected error occurred during project creation: {e}"}), 500
+        logger.error(f"An unexpected error occurred during project creation: {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"An unexpected error occurred: {e}"}), 500
     finally:
         if conn:
             conn.close()
