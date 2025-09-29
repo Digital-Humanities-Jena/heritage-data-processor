@@ -298,7 +298,36 @@ def _extract_and_prepare_metadata(conn: sqlite3.Connection, source_file_db_id: i
         elif map_type == "construct_later":
             all_extracted_metadata[field] = {"construct_later": True}
         elif map_type == "complex":
-            all_extracted_metadata[field] = mapping
+            processed_complex_entries = []
+            if "entries" in mapping and isinstance(mapping["entries"], list):
+                for entry_map in mapping["entries"]:
+                    processed_entry = {}
+                    has_data = False
+                    for attr_key, attr_map in entry_map.items():
+                        attr_type = attr_map.get("type")
+                        attr_value_source = attr_map.get("value")
+
+                        if (
+                            attr_type == "column"
+                            and mapping_mode == "file"
+                            and attr_value_source in row_data_for_file
+                            and pd.notna(row_data_for_file[attr_value_source])
+                        ):
+                            processed_entry[attr_key] = row_data_for_file[attr_value_source]
+                            has_data = True
+                        elif (
+                            attr_type == "literal"
+                            and attr_value_source is not None
+                            and str(attr_value_source).strip() != ""
+                        ):
+                            processed_entry[attr_key] = attr_value_source
+                            has_data = True
+
+                    if has_data:
+                        processed_complex_entries.append(processed_entry)
+
+            if processed_complex_entries:
+                all_extracted_metadata[field] = processed_complex_entries
 
     return all_extracted_metadata, file_info_dict, mapping_config_full
 

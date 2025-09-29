@@ -82,7 +82,7 @@ Afterwards, follow the instructions to install Command Line Tools for Xcode, the
 
     ```bash
     # --- Create Virtual Environment ---
-    uv venv python=3.11
+    uv venv --python=3.11
 
     # --- Activate Virtual Environment ---
     # - macOS/Linux:
