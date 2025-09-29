@@ -1,29 +1,12 @@
 ## **Heritage Data Processor (HDP): Enrich & Persistify your Cultural Heritage Data**
 
-### **Introduction**
 The **Heritage Data Processor (HDP)** is a sophisticated, GUI, API, and Command-Line-driven application designed for the comprehensive processing, enrichment, and management of digital assets, with a primary focus on multimodality. This toolbox provides a robust suite of functionalities for academics, researchers, and professionals in digital heritage and related fields. It leverages a powerful combination of machine learning models, large language models (LLMs), and external APIs to automate complex data-processing workflows.
 
 The HDP is intended to be used for the construction of complex **Pipelines**, based on a modular system of **Pipeline Components**, with a persistent storage as its endpoint using **Zenodo**.
 
 More information about this application will be provided soon.
 
-#### **Pipeline Components**
-The modular **Pipeline Components** that form the core of this application's processing capabilities will be added in an upcoming commit. A comprehensive **Developer's Guide** for creating and modifying these components will follow.
-
-### **Planned Updates for Upcoming Version (0.1.0-alpha.5)**
-* Enable Zenodo Production Mode
-* Enable Complex Pipeline Components (3D- and CUDA-related)
-* Add Test Datasets, Excel/CSV Templates and CLI/Scripting Guides
-* Essential bugfixes for Metadata forwarding
-* Add refresh of HDP components after downloading HDP components
-* Add autosave mechanism for Pipeline Constructor and add warnings if unsaved
-
-
-**Known Bugs** and some missing features are listed in the [Backlog](./BACKLOG.md) (incomplete).
-
-
-
-## 🚧 (Early) Alpha Stage Software
+### 🚧 (Early) Alpha Stage Software
 This project is currently in its **Alpha phase**.
 Several features and modules are **intentionally disabled** for safety and stability reasons.
 As development progresses, these will be **gradually enabled** in future versions after further testing, validation, and security reviews.
@@ -34,6 +17,34 @@ Functionality, APIs, and data formats may change without notice until we reach a
 **⚠ Important:** Do not use this software in production or for sensitive operations.
 
 Bug reports, feedback, and contributions to help us reach a stable Beta and final release are highly welcomed. Please respect that, due to limited time resources, I can only work on this project for a few hours per week.
+
+### Planned Updates for Upcoming Version (0.1.0-alpha.5)
+* Enable Complex Pipeline Components (3D- and CUDA-related)
+* Add Test Datasets, Excel/CSV Templates and CLI/Scripting Guides
+* Add refresh of HDP components after downloading HDP components
+* Add autosave mechanism for Pipeline Constructor and add warnings if unsaved
+
+
+**Known Bugs** and some missing features are listed in the [Backlog](./BACKLOG.md) (incomplete).
+
+## Documentation & Guides
+
+This project is accompanied by a series of guides to help you get started and make the most of the application's features.
+
+* **[Installation and Setup Guide](https://github.com/Digital-Humanities-Jena/heritage-data-processor/blob/main/Tutorials/00_Install_and_Update.md)**: A comprehensive guide to installing the application and setting up your environment.
+* **[API Key Setup Guide](https://github.com/Digital-Humanities-Jena/heritage-data-processor/blob/main/Tutorials/01_API_Key_Setup.md)**: Learn how to configure your API keys for services like Zenodo.
+
+**GUI Workflow Guides:**
+
+* **[Creating a New Project](https://github.com/Digital-Humanities-Jena/heritage-data-processor/blob/main/Tutorials/GUI/00_Create_Project.md)**: A step-by-step walkthrough of the New Project Wizard.
+* **[Basic Metadata Mapping](https://github.com/Digital-Humanities-Jena/heritage-data-processor/blob/main/Tutorials/GUI/01_Basic_Mapping.md)**: Learn how to use the Metadata Mapping Wizard to prepare your data for publication.
+* **[The Uploads Workflow](https://github.com/Digital-Humanities-Jena/heritage-data-processor/blob/main/Tutorials/GUI/02_Uploads.md)**: A complete guide to the process of uploading your records to Zenodo.
+
+**Development-Related Guides:**
+* **[Pipeline Component Structure](https://github.com/Digital-Humanities-Jena/heritage-data-processor/blob/main/Tutorials/Development/Pipeline_Component_Structure.md)**
+
+... more tutorials regarding various aspects of the HDP will follow!
+
 
 ## Getting Started
 

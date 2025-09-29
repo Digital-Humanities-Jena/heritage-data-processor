@@ -7,7 +7,6 @@ import { navigateToView } from '../core/navigation.js';
 // --- DOM Elements ---
 // Main View & Tabs
 const uploadsEnvToggleEl = document.getElementById('uploadsEnvToggle');
-const uploadsCreateEnvToggleEl = document.getElementById('uploadsCreateEnvToggle');
 const productionWarningEl = document.getElementById('productionWarning');
 const refreshUploadsViewBtn = document.getElementById('refreshUploadsViewBtn');
 const uploadsTabBtns = document.querySelectorAll('.uploads-tab-btn');
@@ -335,12 +334,19 @@ async function handlePrepareMetadataClick(event) {
     openUploadProgressModal(`File ID ${sourceFileId}`);
     updateUploadProgressUI({ status: `Preparing metadata...`, progress: 10, logMsg: `Requesting metadata preparation...` });
     try {
+        const isSandbox = uploadsEnvToggleEl.value === 'sandbox';
+        if (!isSandbox && !confirm('⚠️ PRODUCTION ⚠️\n\nYou are about to prepare metadata for a new PRODUCTION record. Continue?')) {
+            // Manually close the progress modal if the user cancels
+            if (uploadProgressModalEl) uploadProgressModalEl.classList.add('hidden');
+            return;
+        }
         const response = await fetch(`${PYTHON_API_BASE_URL}/api/project/prepare_metadata_for_file`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 source_file_db_id: sourceFileId,
-                hdpcPath: currentlyLoadedHdpcPath
+                hdpcPath: currentlyLoadedHdpcPath,
+                target_is_sandbox: isSandbox
             })
         });
         const result = await response.json();
@@ -692,7 +698,12 @@ async function handleUploadFileClick(event) {
 
 async function handlePublishRecordClick(event) {
     const localRecordDbId = event.target.dataset.recordId;
-    if (!confirm(`Are you sure you want to publish this record? This cannot be undone.`)) return;
+    const isSandbox = uploadsEnvToggleEl.value === 'sandbox';
+    let confirmationMessage = 'Are you sure you want to publish this record? This action cannot be undone.';
+    if (!isSandbox) {
+        confirmationMessage = '⚠️ PRODUCTION ⚠️\n\nYou are about to publish this record to the LIVE Zenodo server. This is a permanent action.\n\nAre you absolutely sure you want to proceed?';
+    }
+    if (!confirm(confirmationMessage)) return;
     openUploadProgressModal(`Record ID ${localRecordDbId}`);
     updateUploadProgressUI({ status: `Publishing record...`, progress: 10, logMsg: `Requesting publish...` });
     try {
@@ -712,7 +723,12 @@ async function handlePublishRecordClick(event) {
 
 async function handleDiscardDraftClick(event) {
     const localRecordId = event.target.dataset.localRecordId;
-    if (!confirm(`Are you sure you want to discard this Zenodo draft?`)) return;
+    const isSandbox = uploadsEnvToggleEl.value === 'sandbox';
+    if (!isSandbox && !confirm('⚠️ PRODUCTION ⚠️\n\nAre you sure you want to discard this LIVE Zenodo draft?')) {
+        return;
+    } else if (isSandbox && !confirm('Are you sure you want to discard this Zenodo draft?')) {
+        return;
+    }
     openUploadProgressModal(`Discarding Draft (DB ID: ${localRecordId})`);
     updateUploadProgressUI({ status: "Requesting draft discard...", progress: 10 });
     try {
@@ -1318,13 +1334,13 @@ export function initUploads() {
             pipelineSelectionSection.appendChild(overwriteInfoEl);
         }
     }
-    if (uploadsEnvToggleEl) uploadsEnvToggleEl.addEventListener('change', refreshUploadsView);
-    if (refreshUploadsViewBtn) refreshUploadsViewBtn.addEventListener('click', refreshUploadsView);
-    if (uploadsCreateEnvToggleEl) {
-        uploadsCreateEnvToggleEl.addEventListener('change', () => {
-            productionWarningEl.classList.toggle('hidden', uploadsCreateEnvToggleEl.value !== 'production');
+    if (uploadsEnvToggleEl) {
+        uploadsEnvToggleEl.addEventListener('change', () => {
+            productionWarningEl.classList.toggle('hidden', uploadsEnvToggleEl.value !== 'production');
+            refreshUploadsView();
         });
     }
+    if (refreshUploadsViewBtn) refreshUploadsViewBtn.addEventListener('click', refreshUploadsView);
     uploadsTabBtns.forEach(button => {
         button.addEventListener('click', () => {
             currentUploadsTab = button.dataset.tabId;
@@ -1357,7 +1373,7 @@ export function initUploads() {
             return;
         }
 
-        const targetIsSandboxForCreation = uploadsCreateEnvToggleEl.value === 'sandbox';
+        const targetIsSandbox = uploadsEnvToggleEl.value === 'sandbox';
         const actionDescription = uploadsBatchActionDropdownEl.options[uploadsBatchActionDropdownEl.selectedIndex].text;
 
         if (!confirm(`Are you sure you want to execute "${actionDescription}" on ${itemIds.length} item(s)?`)) {
@@ -1377,7 +1393,7 @@ export function initUploads() {
                 body: JSON.stringify({ 
                     action_type: actionType, 
                     item_ids: itemIds,
-                    target_is_sandbox: targetIsSandboxForCreation
+                    target_is_sandbox: targetIsSandbox
                 })
             });
             const batchResult = await response.json();

@@ -258,19 +258,12 @@
                         <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
                             <div class="flex items-center space-x-4">
                                 <div>
-                                    <label for="uploadsEnvToggle" class="text-sm font-medium text-gray-700 mr-1">View Records For:</label>
+                                    <label for="uploadsEnvToggle" class="text-sm font-medium text-gray-700 mr-1">Current Environment:</label>
                                     <select id="uploadsEnvToggle" class="p-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-blue-500 focus:border-blue-500">
                                         <option value="sandbox" selected>Sandbox</option>
-                                        <option value="production">Production</option>
+                                        <option value="production" style="color: #D32F2F; font-weight: bold;">Production (Live)</option>
                                     </select>
-                                </div>
-                                <div class="border-l pl-4">
-                                    <label for="uploadsCreateEnvToggle" class="text-sm font-medium text-gray-700 mr-1">Target for New Records:</label>
-                                    <select id="uploadsCreateEnvToggle" class="p-2 border border-gray-300 rounded-md text-sm bg-white focus:ring-blue-500 focus:border-blue-500">
-                                        <option value="sandbox" selected>Sandbox (Default)</option>
-                                        <option value="production" id="createInProductionOption" style="color: #D32F2F; font-weight: bold;">Production (Live!)</option>
-                                    </select>
-                                    <span id="productionWarning" class="text-xs text-red-600 font-semibold ml-2 hidden">⚠️ CAUTION: PRODUCTION!</span>
+                                    <span id="productionWarning" class="text-xs text-red-600 font-semibold ml-2 hidden">⚠️ CAUTION: All actions on this page will target the LIVE Zenodo server.</span>
                                 </div>
                             </div>
                             <div class="flex items-center space-x-2">
@@ -280,11 +273,11 @@
                                 <button type="button" id="uploadsViewAddDirectoryBtn" class="bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-3 rounded-md text-sm">
                                     Add Directory
                                 </button>
+                                <button id="refreshUploadsViewBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white text-sm py-2 px-3 rounded-md">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1" fill="none" viewBox="0 0 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2a8.001 8.001 0 0015.357 2M9 15h4.581" /></svg>
+                                    Refresh View
+                                </button>
                             </div>
-                            <button id="refreshUploadsViewBtn" class="bg-indigo-500 hover:bg-indigo-600 text-white text-sm py-2 px-3 rounded-md">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m-15.357-2a8.001 8.001 0 0015.357 2M9 15h4.581" /></svg>
-                                Refresh View
-                            </button>
                         </div>
 
                         <div class="border-b border-gray-200 mb-4">
