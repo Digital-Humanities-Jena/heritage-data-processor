@@ -1,3 +1,4 @@
+<!-- src/renderer/index.html -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -859,32 +860,142 @@
                         </div>
                     </div>
 
-                    <!-- Bundling Options (Now at the correct level) -->
-                    <div id="bundlingOptionsContainer" class="space-y-3 pt-3 border-t">
-                        <h4 class="text-sm font-medium text-gray-700">Bundling Options:</h4>
-                        <label class="flex items-center">
-                            <input type="checkbox" id="bundleCongruentPatterns" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                            <span class="ml-2 text-sm text-gray-600">Bundle files with congruent filenames (Root Mode only)</span>
+                    <!-- Bundling Options -->
+                    <div id="bundlingOptionsContainer" class="hidden">
+                        <label class="flex items-center space-x-2">
+                            <input type="checkbox" id="bundleCongruentPatterns" />
+                            <span class="text-sm font-medium text-gray-700">Bundle related files together</span>
                         </label>
+                        
+                        <div class="ml-6 mt-3">
+                            <label for="bundlingStrategy" class="block text-sm font-medium text-gray-700 mb-1">
+                                Bundling Strategy
+                            </label>
+                            <select id="bundlingStrategy" class="w-full p-2 border rounded-md text-sm" disabled>
+                                <option value="stem">Match by stem (filename without extension)</option>
+                                <option value="pattern">Match by regex pattern with capture groups</option>
+                                <option value="prefix_suffix">Extract core by removing prefix/suffix patterns</option>
+                                <option value="core_identifier">Extract core identifier from anywhere in filename</option>
+                            </select>
+                        </div>
+                        
+                        <div id="bundlingPatternContainer" class="ml-6 mt-3 space-y-3 hidden">
+                            <!-- Pattern with capture groups -->
+                            <div id="patternInputContainer" class="hidden">
+                                <label for="bundlingPattern" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Pattern (with capture group)
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="bundlingPattern" 
+                                    class="w-full p-2 border rounded-md text-sm font-mono"
+                                    placeholder="e.g., (model_\w+) or (scan_\d+)"
+                                />
+                                <p class="text-xs text-gray-500 mt-1">
+                                    Use parentheses () to capture the core identifier. Files with the same captured value will be bundled.
+                                </p>
+                            </div>
+                            
+                            <!-- Prefix/Suffix with stem variable -->
+                            <div id="prefixInputContainer" class="hidden">
+                                <label for="bundlingPrefix" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Prefix Pattern (regex)
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="bundlingPrefix" 
+                                    class="w-full p-2 border rounded-md text-sm font-mono"
+                                    placeholder="e.g., n\d+_ or batch\d+_"
+                                />
+                            </div>
+                            
+                            <div id="suffixInputContainer" class="hidden">
+                                <label for="bundlingSuffixInput" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Suffix Pattern (regex)
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="bundlingSuffixInput" 
+                                    class="w-full p-2 border rounded-md text-sm font-mono"
+                                    placeholder="e.g., _\w+ or _v\d+"
+                                />
+                            </div>
+                            
+                            <!-- Stem Variable Checkbox -->
+                            <div id="stemVariableContainer" class="hidden">
+                                <label class="flex items-center space-x-2">
+                                    <input type="checkbox" id="useStemVariable" class="h-4 w-4 rounded" checked />
+                                    <span class="text-sm text-gray-700">Extract core identifier (remove matched prefix/suffix)</span>
+                                </label>
+                                <p id="coreIdentifierHelp" class="text-xs text-blue-600 ml-6 mt-1">
+                                    Prefix/suffix will be treated as regex patterns to extract the core identifier
+                                </p>
+                            </div>
+                            
+                            <!-- Core Identifier -->
+                            <div id="coreIdentifierContainer" class="hidden">
+                                <label for="corePatternInput" class="block text-sm font-medium text-gray-700 mb-1">
+                                    Core Identifier Pattern
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="corePatternInput" 
+                                    class="w-full p-2 border rounded-md text-sm font-mono"
+                                    placeholder="e.g., (model_\w+)"
+                                />
+                                <p class="text-xs text-gray-500 mt-1">
+                                    Pattern to extract the core identifier regardless of position in filename
+                                </p>
+                            </div>
+                            
+                            <!-- Dynamic Examples -->
+                            <div id="bundlingExample" class="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                <p class="text-xs text-gray-600">Select a strategy to see examples</p>
+                            </div>
+                        </div>
+
+                        <!-- Primary Source File Options -->
                         <div id="primarySourceFileContainer" class="space-y-1">
                             <label for="primarySourceFileSelect" class="block text-sm font-medium text-gray-700">Primary Source File Extension:</label>
                             <input type="text" id="primarySourceFileSearch" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm" placeholder="Search extensions...">
                             <select id="primarySourceFileSelect" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm bg-white"></select>
                             <p class="text-xs text-gray-500">Select the file extension that is the primary source for a bundle's metadata.</p>
+
+                            <div class="mt-2 p-3 bg-gray-50 border border-gray-200 rounded-md">
+                                <p class="text-xs font-semibold text-gray-700 mb-2">Format-Specific Behavior:</p>
+                                <ul class="text-xs text-gray-600 space-y-1">
+                                    <li><strong>.obj:</strong> Scans for MTL materials and texture references</li>
+                                    <li><strong>.glb:</strong> Self-contained format (no external dependencies)</li>
+                                    <li><strong>.gltf:</strong> Scans for external textures, buffers, and .bin files</li>
+                                    <li><strong>.fbx:</strong> Searches for textures in common folders (textures/, Materials/)</li>
+                                    <li><strong>Other formats:</strong> No automatic dependency scanning</li>
+                                </ul>
+                            </div>
                         </div>
                     </div>
 
                     <!-- OBJ Specific Options (Will hide/show correctly) -->
                     <div id="objOptionsContainer" class="hidden space-y-3 pt-3 border-t">
-                        <h4 class="text-sm font-medium text-gray-700">3D Model (OBJ) Options:</h4>
+                        <h4 class="text-sm font-medium text-gray-700">3D Model Options:</h4>
+                        <p class="text-xs text-gray-500">Configure dependency scanning for supported formats (.obj, .gltf, .fbx)</p>
+                        
+                        <!-- MTL/Materials Checkbox -->
                         <label class="flex items-center">
                             <input type="checkbox" id="addMtlFile" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                            <span class="ml-2 text-sm text-gray-600">Identify and add associated MTL file to each Record</span>
+                            <span class="ml-2 text-sm text-gray-600">Scan for material files (MTL for OBJ)</span>
                         </label>
+                        <p class="text-xs text-gray-500 ml-6">Format-specific: OBJ files will scan for .mtl references</p>
+                        
+                        <!-- Textures Checkbox -->
                         <label class="flex items-center">
                             <input type="checkbox" id="addTextureFiles" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" disabled>
-                            <span class="ml-2 text-sm text-gray-500">Identify and add associated Texture files to each Record</span>
+                            <span class="ml-2 text-sm text-gray-600">Scan for texture files and dependencies</span>
                         </label>
+                        <p class="text-xs text-gray-500 ml-6">
+                            OBJ: Textures in MTL • GLTF: External images/buffers • FBX: Common folders • GLB: Self-contained
+                        </p>
+                        
+                        <!-- Texture Search Directories -->
                         <div id="textureSearchContainer" class="pt-2 space-y-2 opacity-50 transition-opacity">
                             <label class="block text-sm font-medium text-gray-700">Search for Texture Files in these directories:</label>
                             <div id="textureSearchDirsContainer" class="space-y-2">
@@ -894,6 +1005,8 @@
                                 Add Directory to search for Textures...
                             </button>
                         </div>
+                        
+                        <!-- Archive Option -->
                         <div class="pt-3 border-t">
                             <label class="flex items-center">
                                 <input type="checkbox" id="archiveSubdirectories" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" checked>
@@ -902,6 +1015,7 @@
                             <p class="text-xs text-gray-500 ml-6">Recommended for complex models.</p>
                         </div>
                     </div>
+
                 </div>
 
                 <div id="newProjectStep5" class="new-project-step hidden space-y-4">

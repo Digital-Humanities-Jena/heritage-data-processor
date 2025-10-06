@@ -20,7 +20,7 @@ from ..legacy.refactored_cli import (
 from ..services.database import execute_db, get_db_connection, load_project_config_value, query_db
 from ..services.project_manager import project_manager
 from ..utils.decorators import project_required
-from ..utils.file_helpers import calculate_file_hash, get_file_mime_type
+from ..utils.file_helpers import calculate_file_hash, _extract_bundling_key, get_file_mime_type
 from ..utils.file_validator import FileValidator
 from ..utils.model_file_scanner import find_associated_files
 from .zenodo import _extract_and_prepare_metadata
@@ -100,12 +100,12 @@ def get_project_details_with_modality_route():
     return jsonify(project_details), 200
 
 
-@project_bp.route("/project/create_and_scan", methods=["POST"])
+@project_bp.route("/project/create-and-scan", methods=["POST"])
 def create_and_scan_project_route():
     """
     Handles the entire new project creation process: creates the .hdpc file,
-    saves all initial configuration, performs a hierarchical file scan, validates
-    each file, archives assets if needed, and determines its status.
+    saves all initial configuration, performs a hierarchical file scan,
+    validates each file, archives assets if needed, and determines its status.
     """
     data = request.get_json()
     project_name = data.get("projectName")
@@ -129,7 +129,14 @@ def create_and_scan_project_route():
             batch_entity,
         ]
     ):
-        return jsonify({"success": False, "error": "Missing required project data for creation."}), 400
+        return jsonify(success=False, error="Missing required project data for creation."), 400
+
+    hdpc_path = Path(hdpc_path_str)
+    data_in_path = Path(data_in_path_str).resolve()
+    data_out_path = Path(data_out_path_str).resolve()
+
+    if not data_in_path.is_dir():
+        return jsonify(success=False, error=f"The specified Input Data Directory does not exist: {data_in_path}"), 400
 
     hdpc_path = Path(hdpc_path_str)
     data_in_path = Path(data_in_path_str).resolve()
@@ -179,50 +186,66 @@ def create_and_scan_project_route():
             (project_id, json.dumps(modalities), json.dumps(scan_options)),
         )
 
+        # Extract bundling configuration
+        bundling_config = scan_options.get("bundling", {})
+        bundle_congruent = bundling_config.get("enabled", False)
+
         files_added_count = 0
         extensions_to_scan = scan_options.get("extensions", [])
-        primary_source_ext = scan_options.get("primary_source_ext")
-        bundle_congruent = scan_options.get("bundle_congruent_patterns", False)
+        primary_source_ext = scan_options.get("primarysourceext")
         found_files_for_response = []
         processed_paths = set()
 
         if extensions_to_scan:
             file_groups = {}
+
+            # File scanning logic with enhanced bundling
             if batch_entity == "root":
                 if bundle_congruent:
+                    # Enhanced bundling with strategy
                     for file_p in data_in_path.glob("*"):
                         if file_p.is_file() and any(
                             file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
                         ):
-                            group_key = file_p.stem
-                            file_groups.setdefault(group_key, []).append(file_p)
+                            group_key = _extract_bundling_key(file_p.name, bundling_config)
+                            if group_key:
+                                file_groups.setdefault(group_key, []).append(file_p)
+                            else:
+                                # If no key extracted, treat as individual file
+                                file_groups[str(file_p)] = [file_p]
                 else:
+                    # Original non-bundled logic
                     for file_p in data_in_path.glob("*"):
                         if file_p.is_file() and any(
                             file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
                         ):
                             file_groups[str(file_p)] = [file_p]
+
             elif batch_entity == "subdirectory":
                 for subdir in data_in_path.iterdir():
                     if subdir.is_dir():
                         group_key = str(subdir.resolve())
-                        files_in_dir = []
-                        for file_p in subdir.rglob("*"):
-                            if file_p.is_file() and any(
-                                file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
-                            ):
-                                files_in_dir.append(file_p)
+                        files_in_dir = [
+                            file_p
+                            for file_p in subdir.rglob("*")
+                            if file_p.is_file()
+                            and any(file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan)
+                        ]
                         if files_in_dir:
                             file_groups[group_key] = files_in_dir
+
             elif batch_entity == "hybrid":
-                # First, handle files in the root directory just like in 'root' mode
+                # Handle files as in 'root' mode
                 if bundle_congruent:
                     for file_p in data_in_path.glob("*"):
                         if file_p.is_file() and any(
                             file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
                         ):
-                            group_key = file_p.stem
-                            file_groups.setdefault(group_key, []).append(file_p)
+                            group_key = _extract_bundling_key(file_p.name, bundling_config)
+                            if group_key:
+                                file_groups.setdefault(group_key, []).append(file_p)
+                            else:
+                                file_groups[str(file_p)] = [file_p]
                 else:
                     for file_p in data_in_path.glob("*"):
                         if file_p.is_file() and any(
@@ -234,12 +257,12 @@ def create_and_scan_project_route():
                 for subdir in data_in_path.iterdir():
                     if subdir.is_dir():
                         group_key = str(subdir.resolve())
-                        files_in_dir = []
-                        for file_p in subdir.rglob("*"):
-                            if file_p.is_file() and any(
-                                file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan
-                            ):
-                                files_in_dir.append(file_p)
+                        files_in_dir = [
+                            file_p
+                            for file_p in subdir.rglob("*")
+                            if file_p.is_file()
+                            and any(file_p.name.lower().endswith(ext.lower()) for ext in extensions_to_scan)
+                        ]
                         if files_in_dir:
                             file_groups[group_key] = files_in_dir
 
@@ -247,6 +270,7 @@ def create_and_scan_project_route():
                 if not files_in_group:
                     continue
 
+                # Find the primary source file
                 primary_source_file = next(
                     (
                         f
@@ -255,10 +279,15 @@ def create_and_scan_project_route():
                     ),
                     files_in_group[0],
                 )
+
+                # Prioritize OBJ files for dependency scanning
                 obj_file_in_group = next((f for f in files_in_group if f.name.lower().endswith(".obj")), None)
 
-                # The main file for scanning is the OBJ if it exists, otherwise the designated primary file.
+                # For dependency scanning: use OBJ if it exists (has dependencies),
+                # otherwise use the primary source file
                 main_scan_file = obj_file_in_group if obj_file_in_group else primary_source_file
+
+                # Call the enhanced multi-format scanner
                 file_structure = find_associated_files(main_scan_file, scan_options)
 
                 # Helper to get all paths already in the structure

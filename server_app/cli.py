@@ -1,5 +1,4 @@
-#!/usr/bin/env python
-# cli.py
+# server_app/cli.py
 """
 Command-Line Interface for the Heritage Data Processor Application.
 

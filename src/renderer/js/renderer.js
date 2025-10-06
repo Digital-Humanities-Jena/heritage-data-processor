@@ -1,4 +1,4 @@
-// src/renderer/js/main.js
+// src/renderer/js/renderer.js
 
 // --- Module Imports ---
 import { initSettings } from './views/settings.js';

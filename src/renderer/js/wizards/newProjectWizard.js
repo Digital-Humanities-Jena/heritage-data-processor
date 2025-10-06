@@ -12,17 +12,17 @@ const newProjectModal = document.getElementById('newProjectModal');
 const newProjectModalTitle = document.getElementById('newProjectModalTitle');
 const closeNewProjectModalBtn = document.getElementById('closeNewProjectModalBtn');
 const newProjectModalBody = document.getElementById('newProjectModalBody');
-
+// --- Step 1 ---
 const newProjectStep1 = document.getElementById('newProjectStep1');
 const newProjectNameInput = document.getElementById('newProjectName');
 const newProjectShortCodeInput = document.getElementById('newProjectShortCode');
 const newProjectShortCodeHelp = document.getElementById('newProjectShortCodeHelp');
 const suggestedHdpcFilenameEl = document.getElementById('suggestedHdpcFilename');
-
+// --- Step 2 ---
 const newProjectStep2 = document.getElementById('newProjectStep2');
 const chosenHdpcPathDisplay = document.getElementById('chosenHdpcPathDisplay');
 const newProjectModalitySelect = document.getElementById('newProjectModality');
-
+// --- Step 3 ---
 const newProjectStep3 = document.getElementById('newProjectStep3');
 const configPathsForProjectNameEl = document.getElementById('configPathsForProjectName');
 const newProjectDataInPathInput = document.getElementById('newProjectDataInPath');
@@ -31,7 +31,7 @@ const newProjectDataOutPathInput = document.getElementById('newProjectDataOutPat
 const browseDataOutPathBtn = document.getElementById('browseDataOutPathBtn');
 const newProjectBatchEntitySelect = document.getElementById('newProjectBatchEntity');
 const dataInScanResultEl = document.getElementById('dataInScanResult');
-
+// --- Step 4 ---
 const newProjectStep4 = document.getElementById('newProjectStep4');
 const scanSettingsModality = document.getElementById('scanSettingsModality');
 const fileExtensionCheckboxes = document.getElementById('fileExtensionCheckboxes');
@@ -42,11 +42,19 @@ const textureSearchContainer = document.getElementById('textureSearchContainer')
 const textureSearchDirsContainer = document.getElementById('textureSearchDirsContainer');
 const addTextureDirBtn = document.getElementById('addTextureDirBtn');
 const archiveSubdirectories = document.getElementById('archiveSubdirectories');
-const bundlingOptionsContainer = document.getElementById('bundlingOptionsContainer');
-const bundleCongruentPatterns = document.getElementById('bundleCongruentPatterns');
 const primarySourceFileContainer = document.getElementById('primarySourceFileContainer');
 const primarySourceFileSelect = document.getElementById('primarySourceFileSelect');
-
+const bundlingOptionsContainer = document.getElementById('bundlingOptionsContainer');
+const bundleCongruentPatterns = document.getElementById('bundleCongruentPatterns');
+const bundlingStrategySelect = document.getElementById('bundlingStrategy');
+const bundlingPatternContainer = document.getElementById('bundlingPatternContainer');
+const bundlingPatternInput = document.getElementById('bundlingPattern');
+const bundlingPrefixInput = document.getElementById('bundlingPrefix');
+const bundlingSuffixInput = document.getElementById('bundlingSuffixInput');
+const bundlingPatternHelp = document.getElementById('bundlingPatternHelp');
+const useStemVariableCheckbox = document.getElementById('useStemVariable');
+const coreIdentifierHelp = document.getElementById('coreIdentifierHelp');
+// --- Step 5 ---
 const newProjectStep5 = document.getElementById('newProjectStep5');
 const foundFilesListContainer = document.getElementById('foundFilesListContainer');
 const fileStatusModal = document.getElementById('fileStatusModal');
@@ -54,7 +62,7 @@ const closeFileStatusModalBtn = document.getElementById('closeFileStatusModalBtn
 const closeFileStatusModalFooterBtn = document.getElementById('closeFileStatusModalFooterBtn');
 const fileStatusModalTitle = document.getElementById('fileStatusModalTitle');
 const fileStatusModalBody = document.getElementById('fileStatusModalBody');
-
+// --- Step 6 ---
 const newProjectStep6 = document.getElementById('newProjectStep6');
 const newProjectSummaryText = document.getElementById('newProjectSummaryText');
 const newProjectStatus = document.getElementById('newProjectStatus');
@@ -83,9 +91,24 @@ const MODALITY_OPTIONS = [
 function resetNewProjectWizard() {
     currentNewProjectStep = 1;
     newProjectData = {
-        projectName: '', shortCode: '', hdpcPath: '', modalities: [], projectId: null,
-        dataInPath: '', dataOutPath: '', batchEntity: 'root', scanOptions: {}
+        projectName: '',
+        shortCode: '',
+        hdpcPath: '',
+        modalities: [],
+        projectId: null,
+        dataInPath: '',
+        dataOutPath: '',
+        batchEntity: 'root',
+        scanOptions: {}
     };
+    
+    // Reset bundling strategy UI
+    if (bundlingStrategySelect) bundlingStrategySelect.value = 'stem';
+    if (bundlingPatternInput) bundlingPatternInput.value = '';
+    if (bundlingPrefixInput) bundlingPrefixInput.value = '';
+    if (bundlingSuffixInput) bundlingSuffixInput.value = '';
+    if (bundlingPatternContainer) bundlingPatternContainer.classList.add('hidden');
+
     if (newProjectNameInput) newProjectNameInput.value = '';
     if (newProjectShortCodeInput) newProjectShortCodeInput.value = '';
     if (suggestedHdpcFilenameEl) suggestedHdpcFilenameEl.textContent = 'project.hdpc';
@@ -247,6 +270,16 @@ async function updateNewProjectWizardView() {
                     updatePrimarySourceFileDropdown();
                 });
 
+                if (newProjectData.batchEntity === 'root' || newProjectData.batchEntity === 'hybrid') {
+                    if (bundlingOptionsContainer) {
+                        bundlingOptionsContainer.classList.remove('hidden');
+                    }
+                } else {
+                    if (bundlingOptionsContainer) {
+                        bundlingOptionsContainer.classList.add('hidden');
+                    }
+                }
+
                 // Manually trigger the update functions to set the initial state correctly
                 updateObjOptionsVisibility();
                 updatePrimarySourceFileDropdown();
@@ -320,17 +353,45 @@ async function handleNewProjectNext() {
         currentNewProjectStep = 4;
 
     } else if (currentNewProjectStep === 4) {
-        const selectedExtensions = Array.from(fileExtensionCheckboxes.querySelectorAll('.file-ext-checkbox:checked')).map(cb => cb.value);
+        const selectedExtensions = Array.from(
+            fileExtensionCheckboxes.querySelectorAll('.file-ext-checkbox:checked')
+        ).map(cb => cb.value);
+        
         if (selectedExtensions.length === 0) {
-            if (newProjectStatus) newProjectStatus.textContent = "Please select at least one file extension to scan for.";
+            if (newProjectStatus) {
+                newProjectStatus.textContent = 'Please select at least one file extension to scan for.';
+            }
             return;
         }
-        const textureSearchPaths = Array.from(textureSearchDirsContainer.querySelectorAll('.texture-dir-path')).map(input => input.value);
+        
+        const textureSearchPaths = Array.from(
+            textureSearchDirsContainer.querySelectorAll('.texture-dir-path')
+        ).map(input => input.value);
+        
+        // Build bundling configuration
+        const bundlingConfig = {
+            enabled: bundleCongruentPatterns.checked,
+            strategy: 'stem' // default
+        };
+        
+        if (bundleCongruentPatterns.checked && bundlingStrategySelect) {
+            bundlingConfig.strategy = bundlingStrategySelect.value;
+            
+            if (bundlingConfig.strategy === 'pattern') {
+                bundlingConfig.pattern = bundlingPatternInput.value.trim();
+            } else if (bundlingConfig.strategy === 'prefix_suffix') {
+                bundlingConfig.prefix = bundlingPrefixInput.value.trim();
+                bundlingConfig.suffix = bundlingSuffixInput.value.trim();
+                bundlingConfig.use_stem_variable = useStemVariableCheckbox.checked;
+            } else if (bundlingConfig.strategy === 'core_identifier') {
+                bundlingConfig.core_pattern = document.getElementById('corePatternInput').value.trim();
+            }
+        }
         
         newProjectData.scanOptions = {
             extensions: selectedExtensions,
             primary_source_ext: primarySourceFileSelect.value,
-            bundle_congruent_patterns: bundleCongruentPatterns.checked,
+            bundling: bundlingConfig,
             obj_options: {
                 add_mtl: addMtlFile.checked,
                 add_textures: addTextureFiles.checked,
@@ -341,7 +402,7 @@ async function handleNewProjectNext() {
 
         if (loader) loader.style.display = 'block';
         try {
-            const response = await fetch(`${PYTHON_API_BASE_URL}/api/project/create_and_scan`, {
+            const response = await fetch(`${PYTHON_API_BASE_URL}/api/project/create-and-scan`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newProjectData)
@@ -612,6 +673,53 @@ function openStatusModal(fileData) {
     fileStatusModal.classList.remove('hidden');
 }
 
+function updatePatternExample(strategy) {
+    const exampleDiv = document.getElementById('bundlingExample');
+    if (!exampleDiv) return;
+    
+    let exampleHTML = '';
+    
+    if (strategy === 'pattern') {
+        exampleHTML = `
+            <p class="text-xs font-semibold text-blue-900 mb-1">Examples:</p>
+            <p class="text-xs text-blue-800 font-mono mb-1">
+                Pattern: <code>model_one</code> matches all files containing "model_one"
+            </p>
+            <p class="text-xs text-blue-800 font-mono mb-1">
+                Pattern: <code>(model_\\w+)</code> extracts "model_one", "model_two", etc. as separate bundles
+            </p>
+            <p class="text-xs text-gray-600 italic">
+                Use capture groups () to extract the core identifier
+            </p>
+        `;
+    } else if (strategy === 'prefix_suffix') {
+        exampleHTML = `
+            <p class="text-xs font-semibold text-blue-900 mb-1">Examples:</p>
+            <p class="text-xs text-blue-800 font-mono mb-1">
+                Prefix: <code>n\\d+_</code> removes "n38_", "n99_", etc.
+            </p>
+            <p class="text-xs text-blue-800 font-mono mb-1">
+                Suffix: <code>_\\w+</code> removes "_hiTex", "_lowRes", etc.
+            </p>
+            <p class="text-xs text-gray-600 italic">
+                Files: n38_model_one.glb, n99_model_one.glb, model_one_hiTex.glb → Bundle: "model_one"
+            </p>
+        `;
+    } else if (strategy === 'core_identifier') {
+        exampleHTML = `
+            <p class="text-xs font-semibold text-blue-900 mb-1">Example:</p>
+            <p class="text-xs text-blue-800 font-mono mb-1">
+                Core Pattern: <code>(model_\\w+)</code>
+            </p>
+            <p class="text-xs text-gray-600 italic">
+                Extracts "model_one" from: n38_model_one.glb, model_one.obj, model_one_hiTex.glb
+            </p>
+        `;
+    }
+    
+    exampleDiv.innerHTML = exampleHTML;
+}
+
 // --- Initialization ---
 export function initNewProjectWizard() {
     if (createNewProjectBtn) {
@@ -774,6 +882,87 @@ export function initNewProjectWizard() {
         primarySourceFileSelect.addEventListener('change', () => {
             primarySourceFileSearch.value = primarySourceFileSelect.value;
             primarySourceFileSelect.size = 1; // Collapse on selection
+        });
+    }
+
+    if (bundleCongruentPatterns) {
+        bundleCongruentPatterns.addEventListener('change', () => {
+            const isEnabled = bundleCongruentPatterns.checked;
+            if (bundlingStrategySelect) {
+                bundlingStrategySelect.disabled = !isEnabled;
+            }
+            if (!isEnabled && bundlingPatternContainer) {
+                bundlingPatternContainer.classList.add('hidden');
+            }
+        });
+    }
+
+    if (bundlingStrategySelect) {
+        bundlingStrategySelect.addEventListener('change', (e) => {
+            const strategy = e.target.value;
+            
+            // Reset visibility
+            bundlingPatternContainer.classList.add('hidden');
+            document.getElementById('patternInputContainer').classList.add('hidden');
+            document.getElementById('prefixInputContainer').classList.add('hidden');
+            document.getElementById('suffixInputContainer').classList.add('hidden');
+            document.getElementById('stemVariableContainer').classList.add('hidden');
+            document.getElementById('coreIdentifierContainer').classList.add('hidden');
+            
+            // Show relevant inputs
+            if (strategy === 'pattern') {
+                bundlingPatternContainer.classList.remove('hidden');
+                document.getElementById('patternInputContainer').classList.remove('hidden');
+                updatePatternExample('pattern');
+            } else if (strategy === 'prefix_suffix') {
+                bundlingPatternContainer.classList.remove('hidden');
+                document.getElementById('prefixInputContainer').classList.remove('hidden');
+                document.getElementById('suffixInputContainer').classList.remove('hidden');
+                document.getElementById('stemVariableContainer').classList.remove('hidden');
+                updatePatternExample('prefix_suffix');
+            } else if (strategy === 'core_identifier') {
+                bundlingPatternContainer.classList.remove('hidden');
+                document.getElementById('coreIdentifierContainer').classList.remove('hidden');
+                updatePatternExample('core_identifier');
+            }
+        });
+    }
+
+    if (useStemVariableCheckbox) {
+        useStemVariableCheckbox.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                coreIdentifierHelp.textContent = 
+                    'Prefix/suffix will be treated as regex patterns to extract the core identifier';
+                coreIdentifierHelp.classList.add('text-blue-600');
+            } else {
+                coreIdentifierHelp.textContent = 
+                    'Prefix/suffix will be treated as literal strings';
+                coreIdentifierHelp.classList.remove('text-blue-600');
+            }
+        });
+    }
+
+    // Add pattern validation
+    if (bundlingPatternInput) {
+        bundlingPatternInput.addEventListener('input', () => {
+            const pattern = bundlingPatternInput.value.trim();
+            if (!pattern) {
+                bundlingPatternHelp.textContent = 'Enter a regex pattern or substring to match';
+                bundlingPatternHelp.classList.remove('text-red-500', 'text-green-600');
+                return;
+            }
+            
+            // Validate regex if it looks like a regex pattern
+            try {
+                new RegExp(pattern);
+                bundlingPatternHelp.textContent = 'Valid pattern ✓';
+                bundlingPatternHelp.classList.remove('text-red-500');
+                bundlingPatternHelp.classList.add('text-green-600');
+            } catch (e) {
+                bundlingPatternHelp.textContent = 'Invalid regex pattern. Will be treated as substring.';
+                bundlingPatternHelp.classList.add('text-red-500');
+                bundlingPatternHelp.classList.remove('text-green-600');
+            }
         });
     }
 }

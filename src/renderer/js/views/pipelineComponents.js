@@ -1,4 +1,4 @@
-// js/views/pipelineComponents.js
+// src/renderer/js/views/pipelineComponents.js
 import { PYTHON_API_BASE_URL } from '../core/api.js';
 import { showToast } from '../core/ui.js';
 import { navigateToView } from '../core/navigation.js';

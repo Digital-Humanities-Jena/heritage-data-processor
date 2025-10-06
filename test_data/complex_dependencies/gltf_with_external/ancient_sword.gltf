@@ -1,0 +1,419 @@
+{
+  "accessors": [
+    {
+      "bufferView": 2,
+      "componentType": 5126,
+      "count": 65532,
+      "max": [
+        0.5552756190299988,
+        0.6829185485839844,
+        5.607463359832764
+      ],
+      "min": [
+        -1.872556209564209,
+        -1.2106478214263916,
+        3.8719887733459473
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 786384,
+      "componentType": 5126,
+      "count": 65532,
+      "max": [
+        0.9999985098838806,
+        0.9999538660049438,
+        0.999994695186615
+      ],
+      "min": [
+        -0.999991774559021,
+        -0.9999990463256836,
+        -0.999998927116394
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "componentType": 5126,
+      "count": 65532,
+      "max": [
+        0.9988800287246704,
+        0.991890013217926
+      ],
+      "min": [
+        0.0004799999878741801,
+        0.0004799999878741801
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "componentType": 5125,
+      "count": 359598,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 1572768,
+      "componentType": 5126,
+      "count": 65532,
+      "max": [
+        2.667661190032959,
+        0.8572194576263428,
+        5.5937371253967285
+      ],
+      "min": [
+        -1.5391606092453003,
+        -0.9550305008888245,
+        3.6959073543548584
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 2359152,
+      "componentType": 5126,
+      "count": 65532,
+      "max": [
+        0.9999668002128601,
+        0.9999948143959045,
+        0.999990701675415
+      ],
+      "min": [
+        -0.9999583959579468,
+        -0.999993622303009,
+        -0.9999943375587463
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 524256,
+      "componentType": 5126,
+      "count": 65532,
+      "max": [
+        0.9959700107574463,
+        0.9971699714660645
+      ],
+      "min": [
+        0.0062500000931322575,
+        0.0004799999878741801
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 1438392,
+      "componentType": 5125,
+      "count": 330615,
+      "type": "SCALAR"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 3145536,
+      "componentType": 5126,
+      "count": 43190,
+      "max": [
+        2.6583847999572754,
+        0.8484904766082764,
+        5.597202777862549
+      ],
+      "min": [
+        -1.8606197834014893,
+        -1.1973719596862793,
+        3.7047762870788574
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 2,
+      "byteOffset": 3663816,
+      "componentType": 5126,
+      "count": 43190,
+      "max": [
+        0.9999865889549255,
+        0.9998692870140076,
+        0.99983149766922
+      ],
+      "min": [
+        -0.9997463822364807,
+        -0.9999915957450867,
+        -0.9999732375144958
+      ],
+      "type": "VEC3"
+    },
+    {
+      "bufferView": 1,
+      "byteOffset": 1048512,
+      "componentType": 5126,
+      "count": 43190,
+      "max": [
+        0.9995099902153015,
+        0.9982200264930725
+      ],
+      "min": [
+        0.005400000140070915,
+        0.0005699999746866524
+      ],
+      "type": "VEC2"
+    },
+    {
+      "bufferView": 0,
+      "byteOffset": 2760852,
+      "componentType": 5125,
+      "count": 186942,
+      "type": "SCALAR"
+    }
+  ],
+  "asset": {
+    "extras": {
+      "author": "Virtual Museums of Małopolska (https://sketchfab.com/WirtualneMuzeaMalopolski)",
+      "license": "CC0-1.0 (http://creativecommons.org/publicdomain/zero/1.0/)",
+      "source": "https://sketchfab.com/3d-models/mercury-about-to-kill-argos-by-b-thorvaldsen-bdcd0813bf54467fb879ee1681a3a6d3",
+      "title": "“Mercury about to kill Argos” by B. Thorvaldsen"
+    },
+    "generator": "Sketchfab-12.68.0",
+    "version": "2.0"
+  },
+  "bufferViews": [
+    {
+      "buffer": 0,
+      "byteLength": 3508620,
+      "name": "floatBufferViews",
+      "target": 34963
+    },
+    {
+      "buffer": 0,
+      "byteLength": 1394032,
+      "byteOffset": 3508620,
+      "byteStride": 8,
+      "name": "floatBufferViews",
+      "target": 34962
+    },
+    {
+      "buffer": 0,
+      "byteLength": 4182096,
+      "byteOffset": 4902652,
+      "byteStride": 12,
+      "name": "floatBufferViews",
+      "target": 34962
+    }
+  ],
+  "buffers": [
+    {
+      "byteLength": 9084748,
+      "uri": "ancient_sword.bin"
+    }
+  ],
+  "images": [
+    {
+      "uri": "blade_texture.jpeg"
+    }
+  ],
+  "materials": [
+    {
+      "doubleSided": true,
+      "name": "841_Merkury",
+      "pbrMetallicRoughness": {
+        "baseColorTexture": {
+          "index": 0
+        },
+        "metallicFactor": 0.0,
+        "roughnessFactor": 0.315358231707317
+      }
+    }
+  ],
+  "meshes": [
+    {
+      "name": "841_Merkury__841_Merkury__0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 1,
+            "POSITION": 0,
+            "TEXCOORD_0": 2
+          },
+          "indices": 3,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "841_Merkury__841_Merkury__0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 5,
+            "POSITION": 4,
+            "TEXCOORD_0": 6
+          },
+          "indices": 7,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    },
+    {
+      "name": "841_Merkury__841_Merkury__0",
+      "primitives": [
+        {
+          "attributes": {
+            "NORMAL": 9,
+            "POSITION": 8,
+            "TEXCOORD_0": 10
+          },
+          "indices": 11,
+          "material": 0,
+          "mode": 4
+        }
+      ]
+    }
+  ],
+  "nodes": [
+    {
+      "children": [
+        1
+      ],
+      "matrix": [
+        0.9999910593032837,
+        2.8421633573392343e-16,
+        -0.004230687860399485,
+        0.0,
+        0.004230687860399485,
+        -2.2204261969156118e-16,
+        0.9999910593032837,
+        0.0,
+        2.8327441969033774e-16,
+        -1.0,
+        -2.2324306121283055e-16,
+        0.0,
+        -0.02129760943353176,
+        -159.33828735351563,
+        -10.068109512329137,
+        1.0
+      ],
+      "name": "Sketchfab_model"
+    },
+    {
+      "children": [
+        2
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        -1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "name": "be094603b79745468e8f56905f2b6a26.fbx"
+    },
+    {
+      "children": [
+        3
+      ],
+      "name": "Object_2"
+    },
+    {
+      "children": [
+        4
+      ],
+      "name": "RootNode"
+    },
+    {
+      "children": [
+        5
+      ],
+      "name": "841_Merkury_",
+      "rotation": [
+        0.7346073389053345,
+        0.012911496683955193,
+        0.6782680749893188,
+        -0.011741728521883488
+      ],
+      "scale": [
+        39.49382400512695,
+        39.49382019042969,
+        39.49382019042969
+      ],
+      "translation": [
+        0.05168569087982178,
+        0.0366344228386879,
+        85.02394104003906
+      ]
+    },
+    {
+      "children": [
+        6,
+        7,
+        8
+      ],
+      "matrix": [
+        1.0,
+        0.0,
+        -0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        1.0,
+        0.0,
+        -0.397552490234375,
+        0.17671418190002441,
+        -4.6516852378845215,
+        1.0
+      ],
+      "name": "Object_5"
+    },
+    {
+      "mesh": 0,
+      "name": "841_Merkury__841_Merkury__0"
+    },
+    {
+      "mesh": 1,
+      "name": "841_Merkury__841_Merkury__0"
+    },
+    {
+      "mesh": 2,
+      "name": "841_Merkury__841_Merkury__0"
+    }
+  ],
+  "samplers": [
+    {
+      "magFilter": 9729,
+      "minFilter": 9987,
+      "wrapS": 10497,
+      "wrapT": 10497
+    }
+  ],
+  "scene": 0,
+  "scenes": [
+    {
+      "name": "Sketchfab_Scene",
+      "nodes": [
+        0
+      ]
+    }
+  ],
+  "textures": [
+    {
+      "sampler": 0,
+      "source": 0
+    }
+  ]
+}
