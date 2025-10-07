@@ -19,13 +19,23 @@ Functionality, APIs, and data formats may change without notice until we reach a
 Bug reports, feedback, and contributions to help us reach a stable Beta and final release are highly welcomed. Please respect that, due to limited time resources, I can only work on this project for a few hours per week.
 
 ### Planned Updates for Upcoming Version (0.1.0-alpha.5)
-* Enable Complex Pipeline Components (3D- and CUDA-related)
-* Add Test Datasets, Excel/CSV Templates and CLI/Scripting Guides
-* Add refresh of HDP components after downloading HDP components
-* Add autosave mechanism for Pipeline Constructor and add warnings if unsaved
+* [ ] Enable Complex Pipeline Components (CUDA-related)
+* [x] Enable Production Mode
+* [x] Add Test Datasets, Excel/CSV Templates and CLI/Scripting Guides
+* [x] Add Tutorials
+* [x] Add enhanced pattern detectors to File Bundling Logic
+* [x] Enhance Validators during File Scanning
+* [x] Add support for multiple modality templates
+* [x] Add **Hybrid** File Processing Mode
+* [x] Fix the problem of the component installation modal getting stuck
+* [x] Fix bugs in Metadata Forwarding of Complex / Nested Fields
+* [x] Update Archival Logic to avoid filename collisions
+* [x] Add refresh of HDP components after downloading HDP components
+* [x] Add autosave mechanism for Pipeline Constructor and add warnings if unsaved
+* [x] Update HDPC Schema to v0.1.1
 
 
-**Known Bugs** and some missing features are listed in the [Backlog](./BACKLOG.md) (incomplete).
+More **Known Bugs** and some missing features are listed in the [Backlog](./BACKLOG.md) (incomplete).
 
 ## Documentation & Guides
 
