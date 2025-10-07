@@ -312,15 +312,14 @@ export default class PipelineConstructor {
             return;
         }
 
-        this.currentPipeline = pipelineData;
         this.hideNewPipelineModal();
         
         try {
-            // Create new pipeline (not update)
+            // Create new pipeline by sending it to the backend
             const response = await fetch(`${PYTHON_API_BASE_URL}/api/pipelines`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(this.currentPipeline)
+                body: JSON.stringify(pipelineData)
             });
 
             if (!response.ok) {
@@ -331,26 +330,36 @@ export default class PipelineConstructor {
             const result = await response.json();
             
             if (result.success) {
-                // Add to local list
-                this.pipelines.push({ ...this.currentPipeline });
-                
-                // Reload dropdown and select the new pipeline
-                this.updatePipelineSelector();
+                showToast(`Pipeline "${pipelineData.name}" created successfully!`, 'success');
+
+                // Reload all pipelines from the backend to get the canonical version.
+                await this.loadExistingPipelines();
+
+                // Select the new pipeline in the dropdown.
                 const dropdown = document.getElementById('existingPipelineMainSelect');
                 if (dropdown) {
                     dropdown.value = pipelineData.identifier;
                 }
-                
-                showToast(`Pipeline "${pipelineData.name}" created successfully!`, 'success');
+
+                // Properly load the newly created pipeline. This will render the UI.
+                await this.loadPipeline(pipelineData.identifier);
+
+                // If the newly loaded pipeline has no steps, add the initial one.
+                if (this.currentPipeline && this.currentPipeline.steps.length === 0) {
+                    this.addInitialStep();
+                }
+
+                // After creation and loading, the pipeline is in a saved state.
+                this.clearModifiedState();
+
+            } else {
+                throw new Error(result.error || "Server indicated failure.");
             }
             
         } catch (error) {
             console.error('Error creating new pipeline:', error);
-            showToast('Pipeline created locally but failed to save to database. Please save manually.', 'warning');
+            showToast(`Error creating pipeline: ${error.message}`, 'warning');
         }
-        
-        this.renderBuilderUI();
-        this.addInitialStep();
     }
 
     renderBuilderUI() {

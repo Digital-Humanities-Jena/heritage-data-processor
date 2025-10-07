@@ -38,8 +38,41 @@ const downloadableComponentsContainer = document.getElementById('downloadableCom
 let COMPONENT_API_BASE;
 let installationInProgress = false; // Local state for this view
 
-// --- Core Functions ---
+// --- Helper Functions ---
+/**
+ * Polls the backend until a component is confirmed to exist or a timeout is reached.
+ * @param {string} componentName The name of the component to check for.
+ * @param {number} timeout The maximum time to wait in milliseconds.
+ * @returns {Promise<boolean>} A promise that resolves to true if the component is found.
+ */
+function waitForComponent(componentName, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        const intervalTime = 300;
+        let elapsedTime = 0;
 
+        const interval = setInterval(async () => {
+            try {
+                const response = await fetch(`${COMPONENT_API_BASE}/${componentName}/exists`);
+                const result = await response.json();
+                if (result.exists) {
+                    clearInterval(interval);
+                    resolve(true);
+                } else {
+                    elapsedTime += intervalTime;
+                    if (elapsedTime >= timeout) {
+                        clearInterval(interval);
+                        reject(new Error(`Component '${componentName}' not detected on server after ${timeout}ms.`));
+                    }
+                }
+            } catch (error) {
+                clearInterval(interval);
+                reject(error);
+            }
+        }, intervalTime);
+    });
+}
+
+// --- Core Functions ---
 export async function loadAndDisplayPipelineComponents() {
     if (installationInProgress) {
         console.log('[Components] Skipping refresh - installation in progress');
@@ -560,24 +593,19 @@ export async function showConfigModal(component, stepId) {
 async function installComponent(component) {
     try {
         showToast(`Installing ${component.name}...`, 'info', 5000);
-        
-        const response = await fetch(`${COMPONENT_API_BASE}/install`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ component_name: component.name })
-        });
 
-        const result = await response.json();
-        
-        if (result.success) {
-            showToast(`${component.name} installed successfully!`, 'success');
-            loadAndDisplayPipelineComponents();
+        // Always delegate to the componentInstallationManager to show the full installation modal.
+        // This manager handles file requirements, log streaming, and the correct API endpoint.
+        if (window.componentInstallationManager) {
+            window.componentInstallationManager.showInstallModal(component);
         } else {
-            throw new Error(result.error || 'Installation failed');
+            console.error('CRITICAL: ComponentInstallationManager not found. The application state is inconsistent.');
+            showToast('Error: Installation UI is unavailable. Please restart the application.', 'error');
         }
 
     } catch (error) {
-        console.error('Error installing component:', error);
+        // This will catch any errors if showInstallModal itself fails.
+        console.error('Error initiating component installation:', error);
         showToast(`Installation failed: ${error.message}`, 'error');
     }
 }
@@ -876,12 +904,19 @@ async function handleComponentDownload(event) {
             throw new Error(result.error || 'Download failed on the server.');
         }
 
-        showToast(`'${componentLabel}' downloaded successfully!`, 'success');
+        showToast(`'${componentLabel}' downloaded. Verifying...`, 'info');
+        
+        // Poll the backend to confirm the component is ready before refreshing the UI
+        await waitForComponent(componentName);
+
+        showToast(`'${componentLabel}' is ready!`, 'success');
         button.innerHTML = '✅ Downloaded';
         
-        if (confirm(`Component '${componentLabel}' has been downloaded.\n\nDo you want to open the installation window now?`)) {
+        // Refresh components after confirmation
+        await loadAndDisplayPipelineComponents();
+
+        if (confirm(`Component '${componentLabel}' has been installed.\n\nDo you want to open the installation window now?`)) {
             downloadComponentsModal.classList.add('hidden');
-            await loadAndDisplayPipelineComponents();
             
             try {
                 // Use the robust waitForElement function to find the install button after the UI has re-rendered
@@ -891,10 +926,6 @@ async function handleComponentDownload(event) {
                 console.error(error);
                 showToast("Could not automatically open installer. Please find the component in the list and click 'Install'.", "warning");
             }
-
-        } else {
-            // If they cancel the install prompt, just refresh the main component list
-            await loadAndDisplayPipelineComponents();
         }
 
     } catch (error) {

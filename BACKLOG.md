@@ -2,15 +2,15 @@
 
 ### Critical Bugs
 
-- [ ] Fix Creators and Complex Field into Metadata Integration.
-- [ ] Fix Creators and Complex Field Propagation to Record Creation.
+- [x] Fix Creators and Complex Field into Metadata Integration.
+- [x] Fix Creators and Complex Field Propagation to Record Creation.
     - Test Dates etc..
 - [ ] Fix that Description is not being overwritten by Constructed Description (both GUI \& CLI).
 - [ ] Fix that edited Metadata does not appear again after adding the Output Mapping Logic.
-- [ ] Fix file type mismatches in file dialogs.
+- [ ] Fix file type mismatches in file dialogs (currently: partially .hdpc as default).
 - [ ] Fix Keyword Handling (Merge, Separate correctly, Hierarchical Sorting).
-- [ ] Fix Modality Template in Metadata Mapping Configuration Modal.
-- [ ] Fix Output Directory ignorance.
+- [x] Fix Modality Template in Metadata Mapping Configuration Modal.
+- [ ] Fix partial Output Directory ignorance.
 - [ ] Fix that it always creates the directory "models".
 - [ ] Fix that it should initially create the directories listed in "directories" in component.yaml.
 - [ ] Reset Component Installation Modal State after uninstalling the same component (stale success message within session).
@@ -83,7 +83,7 @@
 
 - [ ] Add Upload Options (e.g., Abort Record Creation if File is not found).
 - [ ] Before Upload: remove Absolute Paths in Test Data.
-- [ ] Define file extensions to be considered in Project Creation, exclude others
+- [x] Define file extensions to be considered in Project Creation, exclude others
 - [ ] Upload new components and register them in API.
 
 

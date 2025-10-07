@@ -1,32 +1,28 @@
 # server_app/routes/component_manager.py
-from datetime import datetime
 import io
 import json
 import logging
-from packaging.version import parse as parse_version
-from pathlib import Path
-from queue import Queue
-import requests
+import os
 import shutil
 import sqlite3
 import threading
 import time
-from typing import Any, Dict
 import uuid
-import yaml
 import zipfile
+from datetime import datetime
+from pathlib import Path
+from queue import Queue
+from typing import Any, Dict
 
-from flask import Blueprint, jsonify, request, Response
+import requests
+import yaml
+from flask import Blueprint, Response, jsonify, request
+from packaging.version import parse as parse_version
 
 from ..legacy.component_config_loader import ComponentConfigLoader
-
 from ..legacy.component_discovery import ComponentDiscovery
-from ..legacy.component_installer import (
-    install_component,
-    uninstall_component,
-)
+from ..legacy.component_installer import install_component, uninstall_component
 from ..legacy.component_manager import ComponentEnvironmentManager, ComponentInstallationError
-
 from ..services.database import execute_db
 from ..services.project_manager import project_manager
 from ..utils.component_utils import scan_local_pipeline_components
@@ -505,6 +501,16 @@ def get_remote_components():
         return jsonify({"success": False, "error": f"An unexpected error occurred: {str(e)}"}), 500
 
 
+@component_manager_bp.route("/pipeline_components/<component_name>/exists", methods=["GET"])
+def check_component_exists(component_name):
+    """Checks if a component directory exists on the filesystem."""
+    component_dir = COMPONENTS_DIR / component_name
+    if component_dir.is_dir():
+        return jsonify({"success": True, "exists": True})
+    else:
+        return jsonify({"success": True, "exists": False})
+
+
 @component_manager_bp.route("/pipeline_components/download", methods=["POST"])
 def download_component_route():
     """
@@ -554,127 +560,6 @@ def download_component_route():
         if component_dir.exists():
             shutil.rmtree(component_dir)
         return jsonify({"success": False, "error": f"An unexpected error occurred: {e}"}), 500
-
-
-@component_manager_bp.route("/pipeline_components/<component_name>/install", methods=["POST"])
-def install_component_with_requirements(component_name):
-    """Install component with configuration and file requirements."""
-    # --- Validation of Component Name Congruence ---
-    try:
-        component_path = COMPONENTS_DIR / component_name
-        if not component_path.is_dir():
-            return jsonify({"success": False, "error": f"Component directory not found: {component_name}"}), 404
-
-        yaml_path = component_path / "component.yaml"
-        if not yaml_path.exists():
-            return jsonify({"success": False, "error": "component.yaml not found in the component directory."}), 500
-
-        with open(yaml_path, "r") as f:
-            component_config = yaml.safe_load(f)
-            name_in_yaml = component_config.get("name")
-
-        if name_in_yaml != component_name:
-            error_message = (
-                f"Fatal component mismatch detected.\n\n"
-                f"The component's directory is named: '{component_name}'\n"
-                f"But its 'component.yaml' file specifies the name: '{name_in_yaml}'\n\n"
-                f"Please correct the 'name' field in the YAML file to match the directory name to proceed with installation."
-            )
-            # Return a specific error payload that the frontend can display
-            return (
-                jsonify(
-                    {
-                        "success": False,
-                        "error": "Component name mismatch",
-                        "logs": [{"level": "error", "message": error_message}],
-                    }
-                ),
-                400,
-            )
-
-    except Exception as validation_error:
-        logger.error(f"Pre-installation validation failed for {component_name}: {validation_error}", exc_info=True)
-        return (
-            jsonify(
-                {
-                    "success": False,
-                    "error": f"An error occurred during pre-installation validation: {validation_error}",
-                }
-            ),
-            500,
-        )
-
-    try:
-        data = request.get_json()
-        file_paths = data.get("file_paths", {})
-        installation_requirements = data.get("installation_requirements", {})
-
-        component_path = COMPONENTS_DIR / component_name
-        if not component_path.exists():
-            return jsonify({"error": f"Component directory not found: {component_path}"}), 404
-
-        manager = get_component_manager()
-        if manager.is_component_installed(component_name):
-            return jsonify({"success": True, "message": "Component is already installed", "already_installed": True})
-
-        # Validate required files
-        missing_files = []
-        for file_req in installation_requirements.get("required_files", []):
-            if file_req.get("required", True) and file_req["name"] not in file_paths:
-                missing_files.append(file_req["label"])
-        if missing_files:
-            return jsonify({"error": f"Required files missing: {', '.join(missing_files)}"}), 400
-
-        # Prepare and copy files
-        copied_files = {}
-        models_dir = component_path / "models"
-        models_dir.mkdir(exist_ok=True)
-        for name, path_str in file_paths.items():
-            if not path_str:
-                continue
-            source_path = Path(path_str).resolve()
-            if source_path.exists():
-                dest_filename = next(
-                    (
-                        f.get("default_filename", source_path.name)
-                        for f in installation_requirements.get("required_files", [])
-                        + installation_requirements.get("optional_files", [])
-                        if f["name"] == name
-                    ),
-                    source_path.name,
-                )
-                dest_path = (models_dir / dest_filename).resolve()
-                copy_result = smart_copy_file(source_path, dest_path)
-                if copy_result["success"]:
-                    copied_files[name] = str(dest_path)
-                else:
-                    return jsonify({"error": f"Error copying {name}: {copy_result['error']}"}), 500
-
-        success, logs = install_component(component_name, verbose=False, skip_install_script=False)
-
-        if success:
-            installation_config = {
-                "file_paths": copied_files,
-                "original_file_paths": file_paths,
-                "installation_date": datetime.now().isoformat(),
-            }
-            with sqlite3.connect(manager.db_path) as conn:
-                conn.execute(
-                    "INSERT OR REPLACE INTO component_configurations (component_name, config_type, parameters) VALUES (?, 'installation', ?)",
-                    (component_name, json.dumps(installation_config)),
-                )
-            return jsonify({"success": True, "message": "Component installed successfully.", "logs": logs})
-        else:
-            return (
-                jsonify({"success": False, "error": "Installation failed. See logs for details.", "logs": logs}),
-                500,
-            )
-    except ComponentInstallationError as e:
-        logger.error(f"A handled installation error occurred: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-    except Exception as e:
-        logger.error(f"An unhandled error occurred during installation: {e}", exc_info=True)
-        return jsonify({"success": False, "error": f"An unexpected server error occurred: {e}"}), 500
 
 
 @component_manager_bp.route("/pipeline_components/uninstall", methods=["POST"])

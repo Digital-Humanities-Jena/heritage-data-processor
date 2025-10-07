@@ -54,18 +54,6 @@ export default class ComponentInstallationManager {
         }
     }
 
-    showFullInstallModal() {
-        // Show sections and populate them
-        document.querySelector('.install-required-files').style.display = 'block';
-        document.querySelector('.install-optional-files').style.display = 'block';
-        document.querySelector('.install-system-checks').style.display = 'block';
-
-        this.setupSystemChecks(this.installationRequirements.system_checks || []);
-        this.setupRequiredFiles(this.installationRequirements.required_files || []);
-        this.setupOptionalFiles(this.installationRequirements.optional_files || []);
-        this.resetInstallationState();
-    }
-
     setupSystemChecks(systemChecks) {
         const container = document.getElementById('systemChecksContainer');
         container.innerHTML = '';
@@ -342,6 +330,8 @@ export default class ComponentInstallationManager {
     }
 
     showSimpleInstallModal(component) {
+        this.resetInstallationState();
+
         // Hide file requirements sections
         document.querySelector('.install-required-files').style.display = 'none';
         document.querySelector('.install-optional-files').style.display = 'none';
